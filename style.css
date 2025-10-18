@@ -1,0 +1,126 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #f5f6fa;
+}
+
+#map {
+    height: 100vh;
+    width: 100%;
+    z-index: 1;
+}
+
+.leaflet-top.leaflet-left {
+    top: 50px !important;
+}
+
+.status-bar {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    line-height: 1.4;
+    max-width: 90%;
+    display: flex;
+    flex-direction: column;
+}
+
+.distance-info {
+    font-size: 12px;
+    color: #555;
+    margin-top: 4px;
+    font-weight: bold;
+}
+
+.user-input {
+    position: fixed;
+    bottom: 75px; /* Adjusted position */
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-input input {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 14px;
+    width: 150px;
+}
+
+.refresh-btn, .track-btn {
+    position: fixed;
+    top: 15px;
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: background 0.2s ease, opacity 0.2s ease;
+    z-index: 2000;
+}
+
+.refresh-btn { right: 15px; }
+.track-btn { left: 15px; background: #28a745; }
+.track-btn.stop { background: #dc3545; }
+.track-btn:disabled { background: #6c757d; opacity: 0.7; cursor: not-allowed; }
+
+.legend {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    line-height: 1.6;
+    z-index: 9999;
+}
+
+.legend div { display: flex; align-items: center; gap: 6px; }
+.legend-color { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #666; }
+
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.5s, transform 0.3s;
+    z-index: 3000;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.btn { border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.btn-green { background: #28a745; color: #fff; }
+.btn-red { background: #dc3545; color: #fff; }
+
+.leaflet-div-icon { background: transparent !important; border: none !important; box-shadow: none !important; }
