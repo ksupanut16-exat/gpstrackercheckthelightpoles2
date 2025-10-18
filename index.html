@@ -158,10 +158,12 @@
   <script>
     /* ===== CONFIG ===== */
     const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec";
+   // https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec
     const PROXY = "https://corsproxy.io/?";
     const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
     const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
-
+        // https://docs.google.com/spreadsheets/d/1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc/edit?usp=sharing
+        // อยู่ที่ K.supanut ChatGpt 061068
     /* ===== TUNING ===== */
     const MIN_STEP_M = 2;
     const NEAR_CHECK_MS = 3000;
@@ -272,17 +274,30 @@
         });
       }
       function sendStatusToSheet(name, newStatus) {
-        const fullURL = PROXY + encodeURIComponent(WEBHOOK_URL);
-        const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
-        fetch(fullURL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, status: newStatus, user })
-        })
-        .then(r => r.json())
-        .then(() => showToast(`✅ บันทึก "${newStatus}" แล้ว (${name})`, "success"))
-        .catch(e => { console.error(e); showToast("❌ บันทึกล้มเหลว!", "error"); });
-      }
+  const fullURL = PROXY + encodeURIComponent(WEBHOOK_URL);
+  const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
+
+  fetch(fullURL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // 👇 สำคัญ: ใส่ action ให้ตรงกับ doPost ใน Code.gs
+    body: JSON.stringify({ action: "updateStatus", name, status: newStatus, user })
+  })
+  .then(async (r) => {
+    // พยายามอ่านผลลัพธ์ทั้งแบบ JSON/ข้อความเพื่อช่วย debug
+    const txt = await r.text().catch(() => "");
+    let data = null;
+    try { data = JSON.parse(txt); } catch (_) {}
+    if (!r.ok) throw new Error(`HTTP ${r.status} ${txt || ""}`);
+    showToast(`✅ บันทึก "${newStatus}" แล้ว (${name})`, "success");
+    console.log("updateStatus OK:", data ?? txt);
+  })
+  .catch(e => {
+    console.error("updateStatus ERROR:", e);
+    showToast("❌ บันทึกล้มเหลว! ดู console", "error");
+  });
+}
+
 
       function createPopup(marker, name, status, color) {
         const div = document.createElement("div");
