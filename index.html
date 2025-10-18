@@ -72,17 +72,15 @@
 
     .leaflet-div-icon { background: transparent !important; border: none !important; box-shadow: none !important; }
 
-    /* ===================== FILTER UI (เฉพาะใน .top-controls) ===================== */
+    /* ===================== FILTER UI (ติดกับปุ่มเริ่มติดตาม) ===================== */
     .top-controls{
       position: fixed; top: 15px; left: 15px;
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       z-index: 2000;
     }
-    /* ให้ปุ่มเดิมเลิก fixed แล้วปล่อยให้ .top-controls คุมตำแหน่ง */
     .top-controls .track-btn{
       position: static !important; left: auto !important; top: auto !important;
     }
-    /* แถบกรองติดกับปุ่มเริ่มติดตาม (แถวเดียว, เลื่อนแนวนอนได้) */
     .top-controls .filter-bar{
       position: static !important;
       display: flex; align-items: center; gap: 8px;
@@ -133,10 +131,9 @@
     </div>
   </div>
 
-  <!-- ❌ ลบปุ่ม trackBtn ตัวที่ซ้ำออก (เหลือแค่ใน .top-controls) -->
-  <!-- <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button> -->
-
+  <!-- ปุ่มรีเฟรชคงเดิม -->
   <button id="refreshBtn" class="refresh-btn">🔄 อัปเดตตอนนี้</button>
+
   <div id="map"></div>
   <div id="status" class="status-bar">🕓 กำลังโหลดแผนที่...</div>
 
@@ -157,13 +154,14 @@
 
   <script>
     /* ===== CONFIG ===== */
-    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec";
-   // https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec
+    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec"; // <- เปลี่ยนเป็นของคุณถ้าจำเป็น
     const PROXY = "https://corsproxy.io/?";
+
+    // ถ้าตารางมีหลายแท็บ แนะนำระบุ GID ที่แท็บนั้น (ดูจาก URL ของชีต)
     const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
-    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
-        // https://docs.google.com/spreadsheets/d/1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc/edit?usp=sharing
-        // อยู่ที่ K.supanut ChatGpt 061068
+    const SHEET_GID = ""; // เช่น "0" หรือ "123456789" ถ้าเว้นว่าง = ใช้แท็บแรก
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${SHEET_GID ? `gid=${SHEET_GID}&` : ""}tqx=out:json`;
+
     /* ===== TUNING ===== */
     const MIN_STEP_M = 2;
     const NEAR_CHECK_MS = 3000;
@@ -174,7 +172,7 @@
     const GLOBAL_COOLDOWN_MS  = 6_000;
     const AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING = true;
 
-    /* ===== Fallback/Extract รหัสเสา ===== */
+    /* ===== Helper: เติมชื่ออัตโนมัติจากสถานะ (รองรับ SP/HM/SO+ตัวเลข) ===== */
     const NAME_FALLBACK_SET = new Set(["SP01","SO02","SP03","HM01","HM02","HM03"]);
     const toId = (x) => (x ?? "").toString().trim().toUpperCase();
 
@@ -187,14 +185,12 @@
     function deriveName(nameRaw, statusRaw) {
       const nameTxt = (nameRaw ?? "").toString().trim();
       if (nameTxt) return nameTxt;
-      // ก่อนใช้ regex ลองจากเซ็ตคงที่ (กันเคสข้อความสั้น ๆ)
       const idFromStatus = toId(statusRaw);
       if (NAME_FALLBACK_SET.has(idFromStatus)) return idFromStatus;
       const codeFromStatus = extractCode(statusRaw);
       return codeFromStatus || "";
     }
 
-    /* ===== ===== */
     window.onload = () => {
       const map = L.map('map').setView([13.736717, 100.523186], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
@@ -222,12 +218,12 @@
       let isZoomedIn = false;
       let firstDataLoaded = false;
 
-      // สำหรับ throttling & cooldown
+      // throttling & cooldown
       let lastNearCheckAt = 0;
       let lastGlobalNotifyAt = 0;
-      const perPinNotifiedAt = new Map(); // name -> timestamp
+      const perPinNotifiedAt = new Map(); // name -> ts
 
-      /* ===== Helpers ===== */
+      /* ===== Utils ===== */
       function showToast(msg, type="info") {
         toast.textContent = msg;
         toast.style.background = type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#333";
@@ -245,7 +241,6 @@
       }
       function toText(x) { return (x ?? "").toString().trim(); }
 
-      // ตรวจ prefix (SP/HM) ให้ทนหลายรูปแบบ
       function getCodePrefix(x){
         const s = (x ?? "").toString().trim().toUpperCase();
         if (!s) return null;
@@ -257,7 +252,6 @@
       function isSP(x){ return getCodePrefix(x) === "SP"; }
       function isHM(x){ return getCodePrefix(x) === "HM"; }
 
-      // ใช้สีจากสถานะก่อน; ถ้าสถานะว่างให้ fallback จากชื่อ (SP/HM)
       function colorFor(status, name) {
         const s = toText(status);
         const nm = toText(name);
@@ -273,31 +267,32 @@
           className: ""
         });
       }
+
+      /* ===== ส่งอัปเดตสถานะ → ใช้ GET ผ่าน proxy (หลบ 502/redirect) ===== */
       function sendStatusToSheet(name, newStatus) {
-  const fullURL = PROXY + encodeURIComponent(WEBHOOK_URL);
-  const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
+        const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
+        const qs = `?action=updateStatus&name=${encodeURIComponent(name)}&status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(user)}&ts=${Date.now()}`;
+        const direct = WEBHOOK_URL + qs;
+        const urlViaProxy = PROXY + encodeURIComponent(direct);
 
-  fetch(fullURL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    // 👇 สำคัญ: ใส่ action ให้ตรงกับ doPost ใน Code.gs
-    body: JSON.stringify({ action: "updateStatus", name, status: newStatus, user })
-  })
-  .then(async (r) => {
-    // พยายามอ่านผลลัพธ์ทั้งแบบ JSON/ข้อความเพื่อช่วย debug
-    const txt = await r.text().catch(() => "");
-    let data = null;
-    try { data = JSON.parse(txt); } catch (_) {}
-    if (!r.ok) throw new Error(`HTTP ${r.status} ${txt || ""}`);
-    showToast(`✅ บันทึก "${newStatus}" แล้ว (${name})`, "success");
-    console.log("updateStatus OK:", data ?? txt);
-  })
-  .catch(e => {
-    console.error("updateStatus ERROR:", e);
-    showToast("❌ บันทึกล้มเหลว! ดู console", "error");
-  });
-}
-
+        fetch(urlViaProxy, { method: "GET" })
+          .then(async (r) => {
+            const txt = await r.text().catch(() => "");
+            if (!r.ok) throw new Error(`HTTP ${r.status} ${txt || ""}`);
+            showToast(`✅ บันทึก "${newStatus}" แล้ว (${name})`, "success");
+            console.log("updateStatus OK:", txt);
+          })
+          .catch(async (e) => {
+            console.error("updateStatus ERROR (proxy):", e);
+            try {
+              const r2 = await fetch(direct, { method: "GET", mode: "no-cors" });
+              showToast(`✅ บันทึก (สำรอง) "${newStatus}" แล้ว (${name})`, "success");
+            } catch (e2) {
+              console.error("updateStatus ERROR (direct):", e2);
+              showToast("❌ บันทึกล้มเหลว! ดู console", "error");
+            }
+          });
+      }
 
       function createPopup(marker, name, status, color) {
         const div = document.createElement("div");
@@ -323,11 +318,11 @@
             statusTextEl.style.color = newColor;
             statusTextEl.textContent = newStatus;
             marker.setIcon(circleIcon(newColor));
-            marker.options.status = newStatus;
+            marker.options.status = newStatus; // สำคัญสำหรับตัวกรอง
             ding.currentTime = 0; ding.play();
             marker.closePopup();
             sendStatusToSheet(name, newStatus);
-            applyFilters();
+            applyFilters(); // รีเฟรชผลกรอง
           }
           div.querySelector("#onA").onclick  = () => updateStatus("ไฟติดA");
           div.querySelector("#onB").onclick  = () => updateStatus("ไฟติดB");
@@ -352,7 +347,6 @@
           const rows = json.table.rows;
 
           rows.forEach((r, i) => {
-            // อ่านค่าพร้อมสำรองจาก .f (formatted) เผื่อ .v ว่าง
             const rawName   = r.c[0]?.v ?? r.c[0]?.f;   // Name
             const rawLat    = r.c[1]?.v ?? r.c[1]?.f;   // Latitude
             const rawLng    = r.c[2]?.v ?? r.c[2]?.f;   // Longitude
@@ -365,7 +359,6 @@
               return;
             }
 
-            // ถ้า name ว่าง ให้พยายามดึงจาก status แบบอัตโนมัติ (รองรับ SP/HM/ฯลฯ ตามด้วยตัวเลข)
             const name   = deriveName(rawName, rawStatus);
             const status = toText(rawStatus);
 
@@ -387,7 +380,7 @@
           }
 
           statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
-          applyFilters();
+          applyFilters(); // ใช้ตัวกรองกับข้อมูลล่าสุด
         } catch (e) {
           console.error(e);
           statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
@@ -399,18 +392,15 @@
         showToast("🚀 เริ่มติดตามตำแหน่ง...", "success");
         trackBtn.textContent = "⏸️ หยุดติดตาม";
         trackBtn.classList.add("stop");
-
         if (document.documentElement.requestFullscreen) {
           document.documentElement.requestFullscreen().catch(() => {});
         }
-
         watchID = navigator.geolocation.watchPosition(onPosition, onPositionError, {
           enableHighAccuracy: true,
           maximumAge: 1000,
           timeout: 10000
         });
       }
-
       function stopTracking() {
         if (!watchID) return;
         navigator.geolocation.clearWatch(watchID);
@@ -418,12 +408,10 @@
         trackBtn.textContent = "▶️ เริ่มติดตาม";
         trackBtn.classList.remove("stop");
         showToast("🛑 หยุดติดตามแล้ว", "info");
-
         if (document.fullscreenElement) {
           document.exitFullscreen().catch(() => {});
         }
       }
-
       trackBtn.onclick = () => { if (watchID) stopTracking(); else startTracking(); };
       refreshBtn.onclick = loadSheetData;
 
@@ -440,23 +428,14 @@
         // ต่อเส้นทางแบบมีเงื่อนไข
         const newLatLng = L.latLng(latitude, longitude);
         let addedPoint = false;
-        if (userPath.length === 0) {
-          userPath.push(newLatLng);
-          addedPoint = true;
-        } else {
+        if (userPath.length === 0) { userPath.push(newLatLng); addedPoint = true; }
+        else {
           const last = userPath[userPath.length - 1];
           const moved = map.distance(last, newLatLng);
-          if (moved >= MIN_STEP_M) {
-            userPath.push(newLatLng);
-            addedPoint = true;
-          }
+          if (moved >= MIN_STEP_M) { userPath.push(newLatLng); addedPoint = true; }
         }
-
-        if (userPolyline) {
-          if (addedPoint) userPolyline.addLatLng(newLatLng);
-        } else {
-          userPolyline = L.polyline(userPath, { color: "#007bff", weight: 4 }).addTo(map);
-        }
+        if (userPolyline) { if (addedPoint) userPolyline.addLatLng(newLatLng); }
+        else { userPolyline = L.polyline(userPath, { color: "#007bff", weight: 4 }).addTo(map); }
 
         // โฟกัสตำแหน่ง
         map.setView([latitude, longitude], Math.max(map.getZoom(), 17));
@@ -464,20 +443,16 @@
         // แสดงพิกัด
         statusEl.innerHTML = `📍 ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy.toFixed(1)} m)`;
 
-        // Throttle การเช็คใกล้หมุด
+        // เช็คใกล้หมุดแบบ throttle
         if (now - lastNearCheckAt >= NEAR_CHECK_MS) {
           lastNearCheckAt = now;
           checkNearbyMarkers(newLatLng, accuracy, now);
         }
       }
-
-      function onPositionError() {
-        showToast("⚠️ ไม่สามารถระบุตำแหน่งได้!", "error");
-      }
+      function onPositionError() { showToast("⚠️ ไม่สามารถระบุตำแหน่งได้!", "error"); }
 
       function checkNearbyMarkers(latlng, accuracy, nowTs) {
         if (accuracy > ACCURACY_TRIGGER_MAX_M) return;
-
         let nearest = null;
         let nearestDist = Infinity;
 
@@ -498,15 +473,12 @@
           isZoomedIn = true;
           perPinNotifiedAt.set(name, nowTs);
           lastGlobalNotifyAt = nowTs;
-
           map.setView(nearest.getLatLng(), 19, { animate: true });
           nearest.openPopup();
           ding.currentTime = 0; ding.play();
           showToast(`📡 ใกล้จุด ${name} ระยะ ${nearestDist.toFixed(1)} ม.`, "info");
         }
-        if (nearestDist >= ZOOM_OUT_DIST_M && isZoomedIn) {
-          isZoomedIn = false;
-        }
+        if (nearestDist >= ZOOM_OUT_DIST_M && isZoomedIn) { isZoomedIn = false; }
       }
 
       /* === FILTER logic === */
@@ -519,7 +491,7 @@
           case "HM":   return isHM(name) || isHM(st);
           case "ON":   return /ไฟติด/i.test(st);
           case "OFF":  return /ไฟดับ/i.test(st);
-          case "POLE": // เฉพาะ “เสาไฟ” = ไม่ใช่ SP/HM
+          case "POLE": // เฉพาะ “เสาไฟทั่วไป” = ไม่ใช่ SP/HM
             return !(isSP(name) || isHM(name) || isSP(st) || isHM(st));
           default:     return true; // ALL
         }
