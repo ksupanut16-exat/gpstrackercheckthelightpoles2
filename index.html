@@ -148,13 +148,13 @@
   <script>
     /* ===== CONFIG (แก้ให้ตรงโปรเจกต์ของคุณ) ===== */
     // 1) URL ของ Web App ("/exec") ที่ Deploy แล้ว
-    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyVyFpVGC8t2qx3Fq96FBheYftL5eUHBw9pcLHoLCYai0sT4IW695uisSGBQ11vM_LATA/exec"; // ← แก้!
+    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby0v7ycJt9irqUkr8PysOBcUJrm0_tImNKOnTapx1EHFJ692Y1ypB3cfv08AWAPUxnwlQ/exec"; // ← แก้!
     // 2) Proxy สำหรับเลี่ยง CORS (รองรับ redirect ได้ดี)
     const PROXY = "https://corsproxy.io/?";
     // 3) ชีตที่อ่านหมุด (ใช้ gviz)
-    const SHEET_ID  = "1GQZNCAE0ClaD3rGVg4SCJhUffOTsv9ZUvKYBYwJWlVM"; // ← ให้ตรงกับ Code.gs
+    const SHEET_ID = "1lOm7yLsXgSEod9A2l0YCerJdiHI2lD0m5JMPqYqmupY"; // ← ให้ตรงกับ Code.gs
     const SHEET_GID = ""; // ถ้าจะบังคับแท็บ: ใส่ gid (เช่น "0"); ว่าง = แท็บแรก
-    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${SHEET_GID ? `gid=${SHEET_GID}&` : ""}tqx=out:json`;
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
     /* ===== TUNING ===== */
     const MIN_STEP_M = 2;
