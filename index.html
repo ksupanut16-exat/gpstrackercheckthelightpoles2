@@ -96,6 +96,47 @@
       .filter-bar { top: 70px; left: 12px; right: 12px; max-width: unset; }
       .filter-bar input { flex: 1; min-width: 120px; }
     }
+
+    /* กล่องรวมปุ่มบนมุมซ้าย */
+.top-controls{
+  position: fixed; top: 15px; left: 15px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  z-index: 2000;
+}
+
+/* ให้ปุ่มเดิมเลิก fixed แล้วปล่อยให้ .top-controls คุมตำแหน่ง */
+.top-controls .track-btn{
+  position: static !important; left: auto !important; top: auto !important;
+}
+
+/* ย้าย filter-bar ให้ไม่ fixed แล้ววางติดกับปุ่มเริ่มติดตาม */
+.top-controls .filter-bar{
+  position: static !important; top: auto; left: auto;
+  display: flex; flex-wrap: wrap; gap: 8px;
+  background: rgba(255,255,255,0.95);
+  padding: 8px 10px; border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  max-width: min(72vw, 560px);
+}
+.top-controls .filter-bar input{
+  border: 1px solid #ccc; border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; width: 150px;
+}
+
+/* ชิปกรอง (เหมือนเดิม) */
+.chip{
+  border: 1px solid #ccc; background: #fff;
+  padding: 6px 10px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  user-select: none;
+}
+.chip.active{ background:#111; color:#fff; border-color:#111; }
+
+@media (max-width: 600px){
+  .top-controls{ gap: 8px; }
+  .top-controls .filter-bar{ max-width: 88vw; }
+  .top-controls .filter-bar input{ flex: 1; min-width: 120px; }
+}
+
     /* === /FILTER UI === */
   </style>
 </head>
@@ -106,6 +147,11 @@
   </div>
 
   <!-- === FILTER UI === -->
+  <!-- กล่องควบคุมมุมซ้ายบน -->
+<div class="top-controls">
+  <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
+
+  <!-- แถบกรองชิดขวาปุ่ม -->
   <div class="filter-bar">
     <input type="text" id="searchInput" placeholder="ค้นหาชื่อเสา…" />
     <button class="chip active" data-type="ALL">ทั้งหมด</button>
@@ -114,6 +160,8 @@
     <button class="chip" data-type="ON">ไฟติด</button>
     <button class="chip" data-type="OFF">ไฟดับ</button>
   </div>
+</div>
+
   <!-- === /FILTER UI === -->
 
   <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
