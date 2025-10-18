@@ -155,6 +155,7 @@
   <div class="filter-bar">
     <input type="text" id="searchInput" placeholder="ค้นหาชื่อเสา…" />
     <button class="chip active" data-type="ALL">ทั้งหมด</button>
+    <button class="chip" data-type="POLE">เฉพาะเสาไฟ</button>
     <button class="chip" data-type="SP">เฉพาะ SP</button>
     <button class="chip" data-type="HM">เฉพาะ HM</button>
     <button class="chip" data-type="ON">ไฟติด</button>
@@ -271,7 +272,10 @@ function deriveName(nameRaw, statusRaw) {
       function toText(x) {
         return (x ?? "").toString().trim();
       }
-
+      
+      function isSP(x){ return /^\s*SP\b/i.test((x ?? "").toString().trim()); }
+      function isHM(x){ return /^\s*HM\b/i.test((x ?? "").toString().trim()); }
+      
       // ใช้สีจากสถานะก่อน; ถ้าสถานะว่างให้ fallback จากชื่อ (SP/HM)
       function colorFor(status, name) {
         const s = toText(status);
@@ -521,16 +525,19 @@ function deriveName(nameRaw, statusRaw) {
 
       /* === FILTER logic === */
       function markerPassTypeFilter(m) {
-        const name = (m.options.name || "");
-        const st = (m.options.status || "");
-        switch (activeTypeFilter) {
-          case "SP":  return /^SP/i.test(name);
-          case "HM":  return /^HM/i.test(name);
-          case "ON":  return /ไฟติด/i.test(st);
-          case "OFF": return /ไฟดับ/i.test(st);
-          default:    return true; // ALL
-        }
-      }
+  const name = (m.options.name || "");
+  const st   = (m.options.status || "");
+  switch (activeTypeFilter) {
+    case "SP":   return /^SP/i.test(name);     // ตามที่คุณตั้งไว้เดิม (อิงชื่อ)
+    case "HM":   return /^HM/i.test(name);     // ตามที่คุณตั้งไว้เดิม (อิงชื่อ)
+    case "ON":   return /ไฟติด/i.test(st);
+    case "OFF":  return /ไฟดับ/i.test(st);
+    case "POLE": // ★ เฉพาะ “เสาไฟ” = ตัด SP/HM ออก
+      // ถ้า name ว่าง จะพิจารณาจาก status แทน เพื่อกันกรณีเติมชื่อไม่สำเร็จ
+      return !(isSP(name) || isHM(name) || isSP(st) || isHM(st));
+    default:     return true; // ALL
+  }
+}
       function markerPassSearch(m) {
         if (!searchQuery) return true;
         const name = (m.options.name || "").toLowerCase();
