@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>GPS Tracker + เสาไฟ (SP/HM + ไฟติด/ไฟดับ + เต็มจอ + ฟีเจอร์อัปเดตสถานะ + เสียงเตือนใกล้จุด)</title>
+  <title>GPS Tracker + เสาไฟ (SP/HM + ไฟติด/ไฟดับ + เต็มจอ + อัปเดตสถานะ + เสียงเตือนใกล้จุด)</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -103,15 +103,15 @@
     /* ===== CONFIG ===== */
     const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec";
     const PROXY = "https://corsproxy.io/?";
-    const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
+    const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc"; // ปรับเป็นของคุณได้
     const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
     /* ===== TUNING ===== */
-    const MIN_STEP_M = 2;                 // บันทึกจุดใหม่เมื่อขยับเกิน 2 เมตร
-    const NEAR_CHECK_MS = 3000;           // เช็คใกล้หมุดทุก 3 วิ (throttle)
-    const ACCURACY_TRIGGER_MAX_M = 30;    // ไม่แจ้งเตือนถ้า accuracy > 30 ม.
-    const ZOOM_IN_DIST_M = 5;             // เข้าใกล้ <=5 ม. ให้ซูม+เปิด popup
-    const ZOOM_OUT_DIST_M = 10;           // ออกห่าง >=10 ม. ยกเลิกสถานะซูม
+    const MIN_STEP_M = 2;                 // เพิ่มจุดลงเส้นเมื่อขยับ >= 2 ม.
+    const NEAR_CHECK_MS = 3000;           // เช็คใกล้หมุดทุก 3 วินาที (throttle)
+    const ACCURACY_TRIGGER_MAX_M = 30;    // ถ้า accuracy > 30 ม. จะไม่แจ้งเตือน
+    const ZOOM_IN_DIST_M = 5;             // เข้าใกล้ <= 5 ม. → ซูม/เปิด popup
+    const ZOOM_OUT_DIST_M = 10;           // ห่าง >= 10 ม. → คลายสถานะซูม
     const PER_PIN_COOLDOWN_MS = 90_000;   // คูลดาวน์ต่อหมุด 90 วิ
     const GLOBAL_COOLDOWN_MS  = 6_000;    // คูลดาวน์รวม 6 วิ
     const AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING = true;
@@ -127,20 +127,21 @@
       const trackBtn = document.getElementById("trackBtn");
       const refreshBtn = document.getElementById("refreshBtn");
 
-      let markers = [];                   // รายการ Marker ทั้งหมด
-      let markerByName = new Map();       // index เร็วขึ้นสำหรับ lookup
+      let markers = [];
+      let markerByName = new Map();
       let userMarker = null, userCircle = null;
-      let userPath = [];                  // เก็บ latlng เป็น array
+      let userPath = [];
       let userPolyline = null;
       let watchID = null;
       let isZoomedIn = false;
       let firstDataLoaded = false;
 
-      // สำหรับ throttling และ cooldown
+      // สำหรับ throttling & cooldown
       let lastNearCheckAt = 0;
       let lastGlobalNotifyAt = 0;
-      const perPinNotifiedAt = new Map(); // key: marker.options.name, value: timestamp
+      const perPinNotifiedAt = new Map(); // name -> timestamp
 
+      /* ===== Helpers ===== */
       function showToast(msg, type="info") {
         toast.textContent = msg;
         toast.style.background = type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#333";
@@ -148,19 +149,34 @@
         setTimeout(() => toast.classList.remove("show"), 3000);
       }
 
-      function colorForStatus(status) {
-        if (!status) return "blue";
-        if (/^SP/i.test(status)) return "#ff66b2";
-        if (/^HM/i.test(status)) return "#ffd54f";
-        if (/ไฟดับ/i.test(status)) return "red";
-        if (/ไฟติด/i.test(status)) return "green";
+      function toNumber(x) {
+        if (typeof x === "number") return x;
+        if (typeof x === "string") {
+          const cleaned = x.trim().replace(/,/g, ".").replace(/[^\d.\-]/g, "");
+          const n = Number(cleaned);
+          return Number.isFinite(n) ? n : NaN;
+        }
+        return NaN;
+      }
+      function toText(x) {
+        return (x ?? "").toString().trim();
+      }
+
+      // ใช้สีจากสถานะก่อน; ถ้าสถานะว่างให้ fallback จากชื่อ (SP/HM)
+      function colorFor(status, name) {
+        const s = toText(status);
+        const nm = toText(name);
+        if (/^SP/i.test(s) || /^SP/i.test(nm)) return "#ff66b2"; // ชมพู
+        if (/^HM/i.test(s) || /^HM/i.test(nm)) return "#ffd54f"; // เหลือง
+        if (/ไฟดับ/i.test(s)) return "red";
+        if (/ไฟติด/i.test(s)) return "green";
         return "blue";
       }
 
       function circleIcon(color) {
         return L.divIcon({
           html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>`,
-          className: ''
+          className: ""
         });
       }
 
@@ -195,11 +211,11 @@
         marker.bindPopup(popup);
 
         marker.on("popupopen", () => {
-          const statusEl = div.querySelector("#statusText");
+          const statusTextEl = div.querySelector("#statusText");
           function updateStatus(newStatus) {
-            const newColor = colorForStatus(newStatus);
-            statusEl.style.color = newColor;
-            statusEl.textContent = newStatus;
+            const newColor = colorFor(newStatus, name); // อ้างอิงสถานะใหม่
+            statusTextEl.style.color = newColor;
+            statusTextEl.textContent = newStatus;
             marker.setIcon(circleIcon(newColor));
             ding.currentTime = 0; ding.play();
             marker.closePopup();
@@ -219,7 +235,7 @@
           const res = await fetch(SHEET_URL);
           const text = await res.text();
 
-          // ล้าง markers เก่า (ง่าย/เสถียร) — รีเฟรชทุก 5 นาที ผลกระทบต่ำ
+          // ล้าง markers เก่าทั้งหมด (รีเฟรชอัตโนมัติทุก 5 นาที ผลกระทบต่ำ)
           markers.forEach(m => map.removeLayer(m));
           markers = [];
           markerByName.clear();
@@ -227,18 +243,22 @@
           const json = JSON.parse(text.substring(47).slice(0, -2));
           const rows = json.table.rows;
 
-          rows.forEach(r => {
-            const name = r.c[0]?.v;
-            const lat = r.c[1]?.v;
-            const lng = r.c[2]?.v;
-            const status = r.c[8]?.v || ""; // คอลัมน์ Status
-            if (lat && lng) {
-              const color = colorForStatus(status);
-              const m = L.marker([lat, lng], { icon: circleIcon(color), name }).addTo(map);
-              createPopup(m, name, status, color);
-              markers.push(m);
-              markerByName.set(name, m);
+          rows.forEach((r, i) => {
+            const name   = toText(r.c[0]?.v);     // Name (เช่น SP01, HM1)
+            const latNum = toNumber(r.c[1]?.v);   // Latitude
+            const lngNum = toNumber(r.c[2]?.v);   // Longitude
+            const status = toText(r.c[8]?.v);     // Status (ปรับ index ถ้าเปลี่ยนคอลัมน์)
+
+            if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+              console.warn(`[skip row ${i}] invalid lat/lng`, { name, lat: r.c[1]?.v, lng: r.c[2]?.v });
+              return; // ข้ามแถวที่พิกัดไม่ใช่ตัวเลข
             }
+
+            const color = colorFor(status, name);
+            const m = L.marker([latNum, lngNum], { icon: circleIcon(color), name }).addTo(map);
+            createPopup(m, name, status, color);
+            markers.push(m);
+            markerByName.set(name, m);
           });
 
           if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
@@ -264,7 +284,7 @@
 
         watchID = navigator.geolocation.watchPosition(onPosition, onPositionError, {
           enableHighAccuracy: true,
-          maximumAge: 1000,   // ยอมรับค่าล่าสุดที่ cache ไม่เกิน 1 วินาที
+          maximumAge: 1000,
           timeout: 10000
         });
       }
@@ -289,37 +309,40 @@
         const { latitude, longitude, accuracy } = pos.coords;
         const now = Date.now();
 
-        // สร้าง/อัปเดตตำแหน่งปัจจุบัน
+        // อัปเดตตำแหน่งผู้ใช้
         if (userMarker) map.removeLayer(userMarker);
         if (userCircle) map.removeLayer(userCircle);
         userMarker = L.marker([latitude, longitude], { icon: L.divIcon({ html: "📍" }) }).addTo(map);
         userCircle = L.circle([latitude, longitude], { radius: accuracy }).addTo(map);
 
-        // เพิ่มจุดลงเส้นทางแบบมีเงื่อนไข (ลดจุดแน่นเกินไป)
+        // ต่อเส้นทางแบบมีเงื่อนไข (ลดจุดแน่น)
         const newLatLng = L.latLng(latitude, longitude);
+        let addedPoint = false;
         if (userPath.length === 0) {
           userPath.push(newLatLng);
+          addedPoint = true;
         } else {
           const last = userPath[userPath.length - 1];
           const moved = map.distance(last, newLatLng);
-          if (moved >= MIN_STEP_M) userPath.push(newLatLng);
+          if (moved >= MIN_STEP_M) {
+            userPath.push(newLatLng);
+            addedPoint = true;
+          }
         }
 
-        // วาด/ต่อเส้นด้วย addLatLng (ไม่ลบเส้นเดิม)
         if (userPolyline) {
-          // เพิ่มเฉพาะกรณีเกิดจุดใหม่จริง ๆ (ตาม MIN_STEP_M)
-          if (userPath.length >= 2) userPolyline.addLatLng(newLatLng);
+          if (addedPoint) userPolyline.addLatLng(newLatLng);
         } else {
           userPolyline = L.polyline(userPath, { color: "#007bff", weight: 4 }).addTo(map);
         }
 
-        // โฟกัสตำแหน่งปัจจุบัน
+        // โฟกัสตำแหน่ง
         map.setView([latitude, longitude], Math.max(map.getZoom(), 17));
 
-        // อัปเดตสถานะหน้าจอ (สั้น กระชับ)
+        // แสดงพิกัด
         statusEl.innerHTML = `📍 ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy.toFixed(1)} m)`;
 
-        // Throttle: เช็คใกล้หมุดเฉพาะทุก NEAR_CHECK_MS
+        // Throttle การเช็คใกล้หมุด
         if (now - lastNearCheckAt >= NEAR_CHECK_MS) {
           lastNearCheckAt = now;
           checkNearbyMarkers(newLatLng, accuracy, now);
@@ -331,21 +354,16 @@
       }
 
       function checkNearbyMarkers(latlng, accuracy, nowTs) {
-        // ถ้าความแม่นยำแย่เกินเกณฑ์ ให้เลื่อนผ่าน (ลด false positive)
         if (accuracy > ACCURACY_TRIGGER_MAX_M) return;
 
         let nearest = null;
         let nearestDist = Infinity;
-
-        // หา marker ที่ใกล้สุด (วนลูปครั้งเดียว)
         for (const m of markers) {
           const d = map.distance(latlng, m.getLatLng());
           if (d < nearestDist) {
-            nearest = m;
-            nearestDist = d;
+            nearest = m; nearestDist = d;
           }
         }
-
         if (!nearest) return;
 
         const name = nearest.options.name || "(ไม่ทราบชื่อ)";
@@ -353,7 +371,6 @@
         const globalOk = (nowTs - lastGlobalNotifyAt) >= GLOBAL_COOLDOWN_MS;
         const perPinOk  = (nowTs - lastPerPin)        >= PER_PIN_COOLDOWN_MS;
 
-        // logic เข้าใกล้
         if (nearestDist <= ZOOM_IN_DIST_M && globalOk && perPinOk && !isZoomedIn) {
           isZoomedIn = true;
           perPinNotifiedAt.set(name, nowTs);
@@ -365,17 +382,16 @@
           showToast(`📡 ใกล้จุด ${name} ระยะ ${nearestDist.toFixed(1)} ม.`, "info");
         }
 
-        // ออกห่างมากพอ ให้คลายสถานะซูม (ครั้งเดียว)
         if (nearestDist >= ZOOM_OUT_DIST_M && isZoomedIn) {
           isZoomedIn = false;
         }
       }
 
-      // โหลดครั้งแรก + ตั้งรีเฟรชทุก 5 นาที
+      // โหลดครั้งแรก + รีเฟรชทุก 5 นาที
       loadSheetData();
       setInterval(loadSheetData, 300000);
 
-      // หยุดติดตามเมื่อแท็บถูกซ่อน (ประหยัดแบต/เน็ต) — เปิดใช้อีกครั้งเมื่อกลับมา
+      // ประหยัดแบต/เน็ต เมื่อแท็บถูกซ่อนให้หยุดติดตาม
       document.addEventListener("visibilitychange", () => {
         if (document.hidden && watchID) stopTracking();
       });
