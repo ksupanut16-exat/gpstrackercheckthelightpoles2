@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>GPS Tracker V2 (ปรับปรุงประสิทธิภาพ)</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="user-input">
+        <label for="username">👤 ผู้ตรวจ:</label>
+        <input type="text" id="username" placeholder="ระบุชื่อผู้ตรวจ" />
+    </div>
+
+    <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
+    <button id="refreshBtn" class="refresh-btn">🔄 อัปเดตข้อมูล</button>
+    
+    <div id="map"></div>
+
+    <div id="status" class="status-bar">
+        <span>🕓 กำลังโหลดแผนที่...</span>
+        <span id="distance-info" class="distance-info"></span>
+    </div>
+
+    <div class="legend">
+        <b>🗺️ คำอธิบายสี:</b>
+        <div><span class="legend-color" style="background: #ff66b2;"></span> SP</div>
+        <div><span class="legend-color" style="background: #ffd54f;"></span> HM</div>
+        <div><span class="legend-color" style="background: green;"></span> ไฟติด (A/B/AB)</div>
+        <div><span class="legend-color" style="background: red;"></span> ไฟดับ (A/B/AB)</div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <audio id="ding" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
