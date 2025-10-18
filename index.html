@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>GPS Tracker + เสาไฟ (SP/HM + ไฟติด/ไฟดับ + เต็มจอ + อัปเดตสถานะ + เสียงเตือนใกล้จุด)</title>
+  <title>GPS Tracker + เสาไฟ (ฟิลเตอร์ + อัปเดตสถานะ + แจ้งเตือนใกล้จุด)</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body { height: 100%; margin: 0; padding: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: #f5f6fa; }
     #map { height: 100vh; width: 100%; z-index: 1; }
 
-    /* ขยับปุ่มซูมลง ~50px */
     .leaflet-top.leaflet-left { top: 50px !important; }
 
     .status-bar {
@@ -72,7 +71,7 @@
 
     .leaflet-div-icon { background: transparent !important; border: none !important; box-shadow: none !important; }
 
-    /* ===================== FILTER UI (ติดกับปุ่มเริ่มติดตาม) ===================== */
+    /* ===== FILTER UI (ติดกับปุ่มเริ่มติดตาม) ===== */
     .top-controls{
       position: fixed; top: 15px; left: 15px;
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -106,7 +105,6 @@
       .top-controls .filter-bar{ max-width: 88vw; }
       .top-controls .filter-bar input{ flex: 1; min-width: 120px; }
     }
-    /* ============================================================================ */
   </style>
 </head>
 <body>
@@ -115,11 +113,9 @@
     <input type="text" id="username" placeholder="ระบุชื่อผู้ตรวจ" />
   </div>
 
-  <!-- กล่องควบคุมมุมซ้ายบน -->
+  <!-- คอนโทรลมุมซ้ายบน -->
   <div class="top-controls">
     <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
-
-    <!-- แถบกรองชิดขวาปุ่ม -->
     <div class="filter-bar">
       <input type="text" id="searchInput" placeholder="ค้นหาชื่อเสา…" />
       <button class="chip active" data-type="ALL">ทั้งหมด</button>
@@ -131,7 +127,6 @@
     </div>
   </div>
 
-  <!-- ปุ่มรีเฟรชคงเดิม -->
   <button id="refreshBtn" class="refresh-btn">🔄 อัปเดตตอนนี้</button>
 
   <div id="map"></div>
@@ -146,20 +141,19 @@
   </div>
 
   <div id="toast" class="toast"></div>
-
-  <!-- ✅ เสียงติ๊ง -->
   <audio id="ding" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    /* ===== CONFIG ===== */
-    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyVyFpVGC8t2qx3Fq96FBheYftL5eUHBw9pcLHoLCYai0sT4IW695uisSGBQ11vM_LATA/exec"; // <- เปลี่ยนเป็นของคุณถ้าจำเป็น
+    /* ===== CONFIG (แก้ให้ตรงโปรเจกต์ของคุณ) ===== */
+    // 1) URL ของ Web App ("/exec") ที่ Deploy แล้ว
+    const WEBHOOK_URL = "https://script.google.com/macros/s/REPLACE_WITH_YOUR_DEPLOYED_EXEC_URL/exec"; // ← แก้!
+    // 2) Proxy สำหรับเลี่ยง CORS (รองรับ redirect ได้ดี)
     const PROXY = "https://corsproxy.io/?";
-
-    // ถ้าตารางมีหลายแท็บ แนะนำระบุ GID ที่แท็บนั้น (ดูจาก URL ของชีต)
-    const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
-    const SHEET_GID = ""; // เช่น "0" หรือ "123456789" ถ้าเว้นว่าง = ใช้แท็บแรก
+    // 3) ชีตที่อ่านหมุด (ใช้ gviz)
+    const SHEET_ID  = "1GQZNCAE0ClaD3rGVg4SCJhUffOTsv9ZUvKYBYwJWlVM"; // ← ให้ตรงกับ Code.gs
+    const SHEET_GID = ""; // ถ้าจะบังคับแท็บ: ใส่ gid (เช่น "0"); ว่าง = แท็บแรก
     const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${SHEET_GID ? `gid=${SHEET_GID}&` : ""}tqx=out:json`;
 
     /* ===== TUNING ===== */
@@ -175,7 +169,6 @@
     /* ===== Helper: เติมชื่ออัตโนมัติจากสถานะ (รองรับ SP/HM/SO+ตัวเลข) ===== */
     const NAME_FALLBACK_SET = new Set(["SP01","SO02","SP03","HM01","HM02","HM03"]);
     const toId = (x) => (x ?? "").toString().trim().toUpperCase();
-
     function extractCode(str) {
       const s = (str ?? "").toString().trim();
       if (!s) return null;
@@ -223,7 +216,6 @@
       let lastGlobalNotifyAt = 0;
       const perPinNotifiedAt = new Map(); // name -> ts
 
-      /* ===== Utils ===== */
       function showToast(msg, type="info") {
         toast.textContent = msg;
         toast.style.background = type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#333";
@@ -268,7 +260,7 @@
         });
       }
 
-      /* ===== ส่งอัปเดตสถานะ → ใช้ GET ผ่าน proxy (หลบ 502/redirect) ===== */
+      /* ===== อัปเดตสถานะ → GET ผ่าน proxy (กัน 502/redirect) ===== */
       function sendStatusToSheet(name, newStatus) {
         const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
         const qs = `?action=updateStatus&name=${encodeURIComponent(name)}&status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(user)}&ts=${Date.now()}`;
@@ -284,8 +276,9 @@
           })
           .catch(async (e) => {
             console.error("updateStatus ERROR (proxy):", e);
+            // สำรอง: ยิงตรงแบบ no-cors (อ่านผลไม่ได้ แต่ช่วยเคส proxy ล่ม)
             try {
-              const r2 = await fetch(direct, { method: "GET", mode: "no-cors" });
+              await fetch(direct, { method: "GET", mode: "no-cors" });
               showToast(`✅ บันทึก (สำรอง) "${newStatus}" แล้ว (${name})`, "success");
             } catch (e2) {
               console.error("updateStatus ERROR (direct):", e2);
@@ -318,7 +311,7 @@
             statusTextEl.style.color = newColor;
             statusTextEl.textContent = newStatus;
             marker.setIcon(circleIcon(newColor));
-            marker.options.status = newStatus; // สำคัญสำหรับตัวกรอง
+            marker.options.status = newStatus; // สำคัญกับตัวกรอง
             ding.currentTime = 0; ding.play();
             marker.closePopup();
             sendStatusToSheet(name, newStatus);
@@ -338,7 +331,7 @@
           const res = await fetch(SHEET_URL);
           const text = await res.text();
 
-          // ล้าง markers เก่าทั้งหมด
+          // ล้าง markers เก่า
           markers.forEach(m => map.removeLayer(m));
           markers = [];
           markerByName.clear();
@@ -350,14 +343,11 @@
             const rawName   = r.c[0]?.v ?? r.c[0]?.f;   // Name
             const rawLat    = r.c[1]?.v ?? r.c[1]?.f;   // Latitude
             const rawLng    = r.c[2]?.v ?? r.c[2]?.f;   // Longitude
-            const rawStatus = r.c[8]?.v ?? r.c[8]?.f;   // Status (ถ้าคอลัมน์เปลี่ยน ปรับ index นี้)
+            const rawStatus = r.c[8]?.v ?? r.c[8]?.f;   // Status (ถ้าคอลัมน์เปลี่ยน ปรับ index)
 
             const latNum = toNumber(rawLat);
             const lngNum = toNumber(rawLng);
-            if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-              console.warn(`[skip row ${i}] invalid lat/lng`, { rawName, rawLat, rawLng });
-              return;
-            }
+            if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return;
 
             const name   = deriveName(rawName, rawStatus);
             const status = toText(rawStatus);
@@ -380,7 +370,7 @@
           }
 
           statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
-          applyFilters(); // ใช้ตัวกรองกับข้อมูลล่าสุด
+          applyFilters();
         } catch (e) {
           console.error(e);
           statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
@@ -419,13 +409,11 @@
         const { latitude, longitude, accuracy } = pos.coords;
         const now = Date.now();
 
-        // อัปเดตตำแหน่งผู้ใช้
         if (userMarker) map.removeLayer(userMarker);
         if (userCircle) map.removeLayer(userCircle);
         userMarker = L.marker([latitude, longitude], { icon: L.divIcon({ html: "📍" }) }).addTo(map);
         userCircle = L.circle([latitude, longitude], { radius: accuracy }).addTo(map);
 
-        // ต่อเส้นทางแบบมีเงื่อนไข
         const newLatLng = L.latLng(latitude, longitude);
         let addedPoint = false;
         if (userPath.length === 0) { userPath.push(newLatLng); addedPoint = true; }
@@ -437,13 +425,9 @@
         if (userPolyline) { if (addedPoint) userPolyline.addLatLng(newLatLng); }
         else { userPolyline = L.polyline(userPath, { color: "#007bff", weight: 4 }).addTo(map); }
 
-        // โฟกัสตำแหน่ง
         map.setView([latitude, longitude], Math.max(map.getZoom(), 17));
-
-        // แสดงพิกัด
         statusEl.innerHTML = `📍 ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy.toFixed(1)} m)`;
 
-        // เช็คใกล้หมุดแบบ throttle
         if (now - lastNearCheckAt >= NEAR_CHECK_MS) {
           lastNearCheckAt = now;
           checkNearbyMarkers(newLatLng, accuracy, now);
@@ -453,10 +437,8 @@
 
       function checkNearbyMarkers(latlng, accuracy, nowTs) {
         if (accuracy > ACCURACY_TRIGGER_MAX_M) return;
-        let nearest = null;
-        let nearestDist = Infinity;
+        let nearest = null, nearestDist = Infinity;
 
-        // คำนวณเฉพาะหมุดที่ "มองเห็นอยู่" หลังกรองแล้ว
         for (const m of markers) {
           if (!map.hasLayer(m)) continue;
           const d = map.distance(latlng, m.getLatLng());
@@ -473,6 +455,7 @@
           isZoomedIn = true;
           perPinNotifiedAt.set(name, nowTs);
           lastGlobalNotifyAt = nowTs;
+
           map.setView(nearest.getLatLng(), 19, { animate: true });
           nearest.openPopup();
           ding.currentTime = 0; ding.play();
@@ -491,7 +474,7 @@
           case "HM":   return isHM(name) || isHM(st);
           case "ON":   return /ไฟติด/i.test(st);
           case "OFF":  return /ไฟดับ/i.test(st);
-          case "POLE": // เฉพาะ “เสาไฟทั่วไป” = ไม่ใช่ SP/HM
+          case "POLE": // เฉพาะเสาไฟทั่วไป (ไม่ใช่ SP/HM)
             return !(isSP(name) || isHM(name) || isSP(st) || isHM(st));
           default:     return true; // ALL
         }
@@ -505,11 +488,8 @@
         searchQuery = (searchInput?.value || "").trim().toLowerCase();
         markers.forEach(m => {
           const shouldShow = markerPassTypeFilter(m) && markerPassSearch(m);
-          if (shouldShow) {
-            if (!map.hasLayer(m)) m.addTo(map);
-          } else {
-            if (map.hasLayer(m)) map.removeLayer(m);
-          }
+          if (shouldShow) { if (!map.hasLayer(m)) m.addTo(map); }
+          else            { if (map.hasLayer(m)) map.removeLayer(m); }
         });
       }
       chipButtons.forEach(btn => {
@@ -521,13 +501,12 @@
         });
       });
       searchInput?.addEventListener("input", applyFilters);
-      /* === /FILTER logic === */
 
       // โหลดครั้งแรก + รีเฟรชทุก 5 นาที
       loadSheetData();
       setInterval(loadSheetData, 300000);
 
-      // ประหยัดแบต/เน็ต เมื่อแท็บถูกซ่อนให้หยุดติดตาม
+      // ประหยัดแบต/เน็ต: ซ่อนแท็บแล้วหยุดติดตาม
       document.addEventListener("visibilitychange", () => {
         if (document.hidden && watchID) stopTracking();
       });
