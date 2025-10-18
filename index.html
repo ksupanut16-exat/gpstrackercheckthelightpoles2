@@ -1,42 +1,241 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>GPS Tracker V2 (ปรับปรุงประสิทธิภาพ)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>GPS Tracker (เวอร์ชันแก้ไขสมบูรณ์)</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: #f5f6fa; }
+    #map { height: 100vh; width: 100%; z-index: 1; }
+    .leaflet-top.leaflet-left { top: 50px !important; }
+    .status-bar { position: fixed; bottom: 10px; left: 10px; background: rgba(255,255,255,0.95); padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); z-index: 1000; line-height: 1.4; max-width: 90%; }
+    .user-input { position: fixed; bottom: 65px; left: 10px; background: rgba(255,255,255,0.95); padding: 10px 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); z-index: 2000; display: flex; align-items: center; gap: 8px; }
+    .user-input input { border: 1px solid #ccc; border-radius: 6px; padding: 5px 8px; font-size: 14px; width: 150px; }
+    .refresh-btn, .track-btn { position: fixed; top: 15px; background: #007bff; color: white; border: none; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: background 0.2s ease; z-index: 2000; }
+    .refresh-btn { right: 15px; }
+    .track-btn { left: 15px; background: #28a745; }
+    .track-btn.stop { background: #dc3545; }
+    .legend { position: fixed; bottom: 20px; right: 20px; background: rgba(255,255,255,0.95); padding: 10px 12px; border-radius: 8px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); line-height: 1.6; z-index: 9999; }
+    .legend div { display: flex; align-items: center; gap: 6px; }
+    .legend-color { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #666; }
+    .toast { position: fixed; top: 20px; right: 20px; background: #333; color: white; padding: 12px 20px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity 0.5s, transform 0.3s; z-index: 3000; transform: translateY(-20px); }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .btn { border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+    .btn-green { background: #28a745; color: #fff; }
+    .btn-red { background: #dc3545; color: #fff; }
+    .leaflet-div-icon { background: transparent !important; border: none !important; box-shadow: none !important; }
+  </style>
 </head>
 <body>
-    <div class="user-input">
-        <label for="username">👤 ผู้ตรวจ:</label>
-        <input type="text" id="username" placeholder="ระบุชื่อผู้ตรวจ" />
-    </div>
+  <div class="user-input">
+    <label for="username">👤 ผู้ตรวจ:</label>
+    <input type="text" id="username" placeholder="ระบุชื่อผู้ตรวจ" />
+  </div>
 
-    <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
-    <button id="refreshBtn" class="refresh-btn">🔄 อัปเดตข้อมูล</button>
-    
-    <div id="map"></div>
+  <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
+  <button id="refreshBtn" class="refresh-btn">🔄 อัปเดตตอนนี้</button>
+  <div id="map"></div>
+  <div id="status" class="status-bar">🕓 กำลังโหลดแผนที่...</div>
 
-    <div id="status" class="status-bar">
-        <span>🕓 กำลังโหลดแผนที่...</span>
-        <span id="distance-info" class="distance-info"></span>
-    </div>
+  <div class="legend">
+    <b>🗺️ คำอธิบายสี:</b>
+    <div><span class="legend-color" style="background: #ff66b2;"></span> SP</div>
+    <div><span class="legend-color" style="background: #ffd54f;"></span> HM</div>
+    <div><span class="legend-color" style="background: green;"></span> ไฟติด (A/B/AB)</div>
+    <div><span class="legend-color" style="background: red;"></span> ไฟดับ (A/B/AB)</div>
+  </div>
 
-    <div class="legend">
-        <b>🗺️ คำอธิบายสี:</b>
-        <div><span class="legend-color" style="background: #ff66b2;"></span> SP</div>
-        <div><span class="legend-color" style="background: #ffd54f;"></span> HM</div>
-        <div><span class="legend-color" style="background: green;"></span> ไฟติด (A/B/AB)</div>
-        <div><span class="legend-color" style="background: red;"></span> ไฟดับ (A/B/AB)</div>
-    </div>
+  <div id="toast" class="toast"></div>
+  <audio id="ding" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 
-    <div id="toast" class="toast"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <audio id="ding" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+  <script>
+    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec";
+    const PROXY = "https://corsproxy.io/?";
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="script.js"></script>
+    window.onload = () => {
+      const map = L.map('map').setView([13.736717, 100.523186], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+      const sheetID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
+      const sheetURL = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json`;
+
+      const toast = document.getElementById("toast");
+      const ding = document.getElementById("ding");
+      const usernameInput = document.getElementById("username");
+      const statusEl = document.getElementById("status");
+      const trackBtn = document.getElementById("trackBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+
+      let sheetMarkers = [];
+      let userMarker = null, userCircle = null, userPath = [], userPolyline = null, watchID = null;
+      let isZoomedIn = false;
+
+      function showToast(msg, type="info") {
+        toast.textContent = msg;
+        toast.style.background = type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#333";
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 3000);
+      }
+
+      // --- จุดที่แก้ไข ---
+      // ใช้ฟังก์ชันเวอร์ชันที่ตรวจสอบลำดับความสำคัญได้ถูกต้อง
+      function colorForStatus(status) {
+        if (!status) return "#8e44ad"; // สีสำหรับสถานะว่าง
+        
+        const s = String(status).trim().toLowerCase();
+        
+        // 1. ตรวจสอบคำเฉพาะก่อน (SP, HM)
+        if (s.startsWith("sp")) return "#ff66b2";
+        if (s.startsWith("hm")) return "#ffd54f";
+        
+        // 2. ตรวจสอบคำทั่วไปทีหลัง (ไฟติด, ไฟดับ)
+        if (s.includes("ดับ")) return "red";
+        if (s.includes("ติด")) return "green";
+        
+        // 3. ถ้าไม่เข้าเงื่อนไขไหนเลย ให้เป็นสี default
+        return "blue";
+      }
+
+      function sendStatusToSheet(name, newStatus) {
+        const fullURL = PROXY + encodeURIComponent(WEBHOOK_URL);
+        const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
+        fetch(fullURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, status: newStatus, user })
+        })
+        .then(r => r.json())
+        .then(() => showToast(`✅ บันทึก "${newStatus}" แล้ว (${name})`, "success"))
+        .catch(e => { console.error(e); showToast("❌ บันทึกล้มเหลว!", "error"); });
+      }
+
+      function createPopup(marker, name, status, color) {
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <b>${name}</b><br>
+          🔰 <b id="statusText" style="color:${color}">${status || "-"}</b><br><br>
+          <div class="btn-row">
+            <button class="btn btn-green" id="onA">ไฟติด A</button>
+            <button class="btn btn-green" id="onB">ไฟติด B</button>
+            <button class="btn btn-green" id="onAB">ไฟติด AB</button>
+            <button class="btn btn-red" id="offA">ไฟดับ A</button>
+            <button class="btn btn-red" id="offB">ไฟดับ B</button>
+            <button class="btn btn-red" id="offAB">ไฟดับ AB</button>
+          </div>
+        `;
+        const popup = L.popup().setContent(div);
+        marker.bindPopup(popup);
+
+        marker.on("popupopen", () => {
+          const statusEl = div.querySelector("#statusText");
+
+          function updateStatus(newStatus) {
+            const newColor = colorForStatus(newStatus);
+            statusEl.style.color = newColor;
+            statusEl.textContent = newStatus;
+            marker.setIcon(L.divIcon({
+              html: `<div style='background:${newColor};width:18px;height:18px;border-radius:50%;border:2px solid white;'></div>`
+            }));
+            ding.currentTime = 0; ding.play();
+            marker.closePopup();
+            sendStatusToSheet(name, newStatus);
+          }
+
+          document.getElementById("onA").onclick = () => updateStatus("ไฟติดA");
+          document.getElementById("onB").onclick = () => updateStatus("ไฟติดB");
+          document.getElementById("onAB").onclick = () => updateStatus("ไฟติดAB");
+          document.getElementById("offA").onclick = () => updateStatus("ไฟดับA");
+          document.getElementById("offB").onclick = () => updateStatus("ไฟดับB");
+          document.getElementById("offAB").onclick = () => updateStatus("ไฟดับAB");
+        });
+      }
+
+      function loadSheetData() {
+        fetch(sheetURL)
+          .then(res => res.text())
+          .then(text => {
+            sheetMarkers.forEach(m => map.removeLayer(m)); sheetMarkers = [];
+            const json = JSON.parse(text.substring(47).slice(0, -2));
+            const rows = json.table.rows;
+            rows.forEach(r => {
+              const name = r.c[0]?.v, lat = r.c[1]?.v, lng = r.c[2]?.v, status = r.c[8]?.v || "";
+              if (lat && lng) {
+                const color = colorForStatus(status);
+                const icon = L.divIcon({ html: `<div style='background:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;'></div>` });
+                const m = L.marker([lat, lng], { icon, name }).addTo(map);
+                createPopup(m, name, status, color);
+                sheetMarkers.push(m);
+              }
+            });
+            if (sheetMarkers.length) map.fitBounds(L.featureGroup(sheetMarkers).getBounds());
+            statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
+          })
+          .catch(e => { console.error(e); statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ"; });
+      }
+
+      function startTracking() {
+        if (watchID) return;
+        showToast("🚀 เริ่มติดตามตำแหน่ง...", "success");
+        trackBtn.textContent = "⏸️ หยุดติดตาม";
+        trackBtn.classList.add("stop");
+
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+
+        watchID = navigator.geolocation.watchPosition(pos => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          if (userMarker) map.removeLayer(userMarker);
+          if (userCircle) map.removeLayer(userCircle);
+
+          userMarker = L.marker([latitude, longitude], { icon: L.divIcon({ html: "📍" }) }).addTo(map);
+          userCircle = L.circle([latitude, longitude], { radius: accuracy }).addTo(map);
+
+          userPath.push([latitude, longitude]);
+          if (userPolyline) map.removeLayer(userPolyline);
+          userPolyline = L.polyline(userPath, { color: "#007bff", weight: 4 }).addTo(map);
+
+          map.setView([latitude, longitude], 17);
+          checkNearbyMarkers(latitude, longitude);
+          statusEl.innerHTML = `📍 ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy.toFixed(1)} m)`;
+        }, () => showToast("⚠️ ไม่สามารถระบุตำแหน่งได้!", "error"), { enableHighAccuracy: true });
+      }
+
+      function stopTracking() {
+        if (!watchID) return;
+        navigator.geolocation.clearWatch(watchID);
+        watchID = null;
+        trackBtn.textContent = "▶️ เริ่มติดตาม";
+        trackBtn.classList.remove("stop");
+        showToast("🛑 หยุดติดตามแล้ว", "info");
+
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      }
+
+      trackBtn.onclick = () => { if (watchID) stopTracking(); else startTracking(); };
+
+      function checkNearbyMarkers(lat, lng) {
+        sheetMarkers.forEach(marker => {
+          const dist = map.distance([lat, lng], marker.getLatLng());
+          if (dist < 5 && !isZoomedIn) {
+            isZoomedIn = true;
+            map.setView(marker.getLatLng(), 19, { animate: true });
+            marker.openPopup();
+            ding.currentTime = 0; ding.play();
+            showToast(`📡 ใกล้จุด ${marker.options.name} ระยะ ${dist.toFixed(1)} ม.`, "info");
+          } else if (dist >= 10 && isZoomedIn) {
+            isZoomedIn = false;
+          }
+        });
+      }
+
+      loadSheetData();
+      setInterval(loadSheetData, 300000);
+      refreshBtn.onclick = loadSheetData;
+    };
+  </script>
 </body>
 </html>
