@@ -10,8 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
         WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec",
         PROXY_URL: "https://corsproxy.io/?",
         SHEET_ID: "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc",
-        // https://docs.google.com/spreadsheets/d/1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc/edit?usp=sharing
-        // อยู่ที่ K.supanut ChatGpt 061068
         UPDATE_INTERVAL: 300000, 
         ALERT_DISTANCE: 10,
         RESET_DISTANCE: 20,
@@ -286,12 +284,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getColorForStatus(status) {
         if (!status) return "#8e44ad";
-        const s = status.trim().toLowerCase(); // <-- แก้ไขจุดนี้แล้ว
-        if (s.startsWith("sp")) return "#ff66b2";
-        if (s.startsWith("hm")) return "#ffd54f";
+        const s = status.trim().toLowerCase();
+        
+        // --- จุดที่แก้ไข (ใช้ includes แทน startsWith) ---
+        if (s.includes("sp")) return "#ff66b2";
+        if (s.includes("hm")) return "#ffd54f";
         if (s.includes("ดับ")) return "#dc3545";
         if (s.includes("ติด")) return "#28a745";
-        return "#3498db";
+        
+        return "#3498db"; // สี default
     }
     
     function showToast(msg, type = "info") {
