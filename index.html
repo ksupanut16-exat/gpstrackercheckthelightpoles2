@@ -111,17 +111,32 @@
 
 /* ย้าย filter-bar ให้ไม่ fixed แล้ววางติดกับปุ่มเริ่มติดตาม */
 .top-controls .filter-bar{
-  position: static !important; top: auto; left: auto;
-  display: flex; flex-wrap: wrap; gap: 8px;
+  position: static !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: rgba(255,255,255,0.95);
-  padding: 8px 10px; border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-  max-width: min(72vw, 560px);
+
+  /* สำคัญ: บังคับให้ปุ่ม/ช่องค้นหาอยู่บรรทัดเดียว */
+  flex-wrap: nowrap;         /* ไม่ให้ขึ้นบรรทัดใหม่ */
+  white-space: nowrap;       /* ป้องกันตกล่าง */
+  overflow-x: auto;          /* ถ้ามีไม่พอที่ → เลื่อนในแนวนอนได้ */
+  max-width: 92vw;           /* กว้างขึ้นกว่าของเดิม */
 }
+
 .top-controls .filter-bar input{
-  border: 1px solid #ccc; border-radius: 6px;
-  padding: 6px 8px; font-size: 13px; width: 150px;
+  flex: 0 0 auto;            /* ไม่ยืดจนดันชิปตกบรรทัด */
+  width: 140px;              /* ลดกว้างนิดให้พอดีแถวเดียว */
 }
+
+.top-controls .filter-bar .chip{
+  flex: 0 0 auto;            /* ปุ่มไม่หด */
+}
+
+
 
 /* ชิปกรอง (เหมือนเดิม) */
 .chip{
@@ -272,8 +287,20 @@ function deriveName(nameRaw, statusRaw) {
         return (x ?? "").toString().trim();
       }
       
-      function isSP(x){ return /^\s*SP\b/i.test((x ?? "").toString().trim()); }
-      function isHM(x){ return /^\s*HM\b/i.test((x ?? "").toString().trim()); }
+     // ตรวจ prefix (SP/HM) ให้ทนทุกรูปแบบ: "SP01", "sp 01", "SP-01", " HM12 " ฯลฯ
+function getCodePrefix(x){
+  const s = (x ?? "").toString().trim().toUpperCase();
+  if (!s) return null;
+  // จับกรณีขึ้นต้นด้วย SP/HM ตรงๆ
+  let m = s.match(/^(SP|HM)\b/);
+  if (m) return m[1];
+  // จับกรณีมีตัวคั่น/เว้นวรรคก่อนตัวเลข
+  m = s.match(/\b(SP|HM)\s*[- ]?\s*\d+/);
+  return m ? m[1] : null;
+}
+function isSP(x){ return getCodePrefix(x) === "SP"; }
+function isHM(x){ return getCodePrefix(x) === "HM"; }
+
       
       // ใช้สีจากสถานะก่อน; ถ้าสถานะว่างให้ fallback จากชื่อ (SP/HM)
       function colorFor(status, name) {
@@ -526,13 +553,13 @@ function deriveName(nameRaw, statusRaw) {
       function markerPassTypeFilter(m) {
   const name = (m.options.name || "");
   const st   = (m.options.status || "");
+
   switch (activeTypeFilter) {
-    case "SP":   return /^SP/i.test(name);     // ตามที่คุณตั้งไว้เดิม (อิงชื่อ)
-    case "HM":   return /^HM/i.test(name);     // ตามที่คุณตั้งไว้เดิม (อิงชื่อ)
+    case "SP":   return isSP(name) || isSP(st);        // เผื่อกรณี name ว่าง ใช้สถานะช่วย
+    case "HM":   return isHM(name) || isHM(st);
     case "ON":   return /ไฟติด/i.test(st);
     case "OFF":  return /ไฟดับ/i.test(st);
-    case "POLE": // ★ เฉพาะ “เสาไฟ” = ตัด SP/HM ออก
-      // ถ้า name ว่าง จะพิจารณาจาก status แทน เพื่อกันกรณีเติมชื่อไม่สำเร็จ
+    case "POLE": // ★ เฉพาะ “เสาไฟ” = ไม่ใช่ SP/HM
       return !(isSP(name) || isHM(name) || isSP(st) || isHM(st));
     default:     return true; // ALL
   }
