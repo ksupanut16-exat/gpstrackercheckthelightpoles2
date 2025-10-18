@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // หมายเหตุ: การใช้ Proxy ควรเป็นทางเลือกสุดท้าย ควรไปแก้ที่ Google Apps Script ให้รองรับ CORS จะดีที่สุด
         PROXY_URL: "https://corsproxy.io/?",
         SHEET_ID: "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc",
+        // https://docs.google.com/spreadsheets/d/1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc/edit?usp=sharing
+        // อยู่ที่ K.supanut ChatGpt 061068
         UPDATE_INTERVAL: 300000, // อัปเดตข้อมูลจาก Sheet ทุก 5 นาที (300,000 ms)
         ALERT_DISTANCE: 10, // ระยะที่จะแจ้งเตือนเมื่อเข้าใกล้จุด (เมตร)
         RESET_DISTANCE: 20, // ระยะที่จะรีเซ็ตสถานะการซูม (เมตร)
