@@ -85,6 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = await response.text();
             const json = JSON.parse(text.substring(47).slice(0, -2));
             
+            // --- DEBUGGING POINT ---
+            console.log("--- เริ่มการดีบักข้อมูลจาก Google Sheet ---");
+            console.log("ข้อมูลดิบที่ได้รับ (JSON):", json);
+            // --- END DEBUGGING POINT ---
+
             const newMarkerNames = new Set(json.table.rows.map(r => r.c[0]?.v));
             for (const [name, marker] of state.sheetMarkers.entries()) {
                 if (!newMarkerNames.has(name)) {
@@ -93,9 +98,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            json.table.rows.forEach(r => {
+            json.table.rows.forEach((r, index) => {
                 // ดึงข้อมูลสถานะจากคอลัมน์ที่ 9 (index 8)
-                const name = r.c[0]?.v, lat = r.c[1]?.v, lng = r.c[2]?.v, status = r.c[8]?.v || "";
+                const name = r.c[0]?.v;
+                const lat = r.c[1]?.v;
+                const lng = r.c[2]?.v;
+                const statusCell = r.c[8]; // ดึงข้อมูลทั้ง cell ออกมาดูก่อน
+                const status = statusCell?.v || "";
+
+                // --- DEBUGGING POINT ---
+                if(index < 10) { // แสดงข้อมูลแค่ 10 แถวแรกพอ
+                    console.log(`[แถวที่ ${index + 1}] ชื่อ: ${name}, สถานะ: '${status}'`);
+                    console.log("-> ข้อมูลดิบของทั้งแถว:", r.c);
+                }
+                // --- END DEBUGGING POINT ---
+
                 if (name && lat && lng) {
                     updateMarker(name, lat, lng, status);
                 }
@@ -283,11 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * ===================================================================
      */
 
-    // --- จุดที่แก้ไข (จัดลำดับการตรวจสอบใหม่ทั้งหมด) ---
     function getColorForStatus(status) {
-        if (!status) return "#8e44ad"; // สีสำหรับสถานะว่าง
+        if (!status) return "#8e44ad"; 
         
-        const s = status.trim().toLowerCase();
+        const s = String(status).trim().toLowerCase(); // เพิ่ม String() เพื่อความปลอดภัย
         
         // 1. ตรวจสอบคำเฉพาะก่อน (SP, HM)
         if (s.startsWith("sp")) return "#ff66b2";
