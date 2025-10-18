@@ -94,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             json.table.rows.forEach(r => {
+                // ดึงข้อมูลสถานะจากคอลัมน์ที่ 9 (index 8)
                 const name = r.c[0]?.v, lat = r.c[1]?.v, lng = r.c[2]?.v, status = r.c[8]?.v || "";
                 if (name && lat && lng) {
                     updateMarker(name, lat, lng, status);
@@ -282,17 +283,22 @@ document.addEventListener('DOMContentLoaded', () => {
      * ===================================================================
      */
 
+    // --- จุดที่แก้ไข (จัดลำดับการตรวจสอบใหม่ทั้งหมด) ---
     function getColorForStatus(status) {
-        if (!status) return "#8e44ad";
+        if (!status) return "#8e44ad"; // สีสำหรับสถานะว่าง
+        
         const s = status.trim().toLowerCase();
         
-        // --- จุดที่แก้ไข (ใช้ includes แทน startsWith) ---
-        if (s.includes("sp")) return "#ff66b2";
-        if (s.includes("hm")) return "#ffd54f";
+        // 1. ตรวจสอบคำเฉพาะก่อน (SP, HM)
+        if (s.startsWith("sp")) return "#ff66b2";
+        if (s.startsWith("hm")) return "#ffd54f";
+        
+        // 2. ตรวจสอบคำทั่วไปทีหลัง (ไฟติด, ไฟดับ)
         if (s.includes("ดับ")) return "#dc3545";
         if (s.includes("ติด")) return "#28a745";
         
-        return "#3498db"; // สี default
+        // 3. ถ้าไม่เข้าเงื่อนไขไหนเลย ให้เป็นสี default
+        return "#3498db";
     }
     
     function showToast(msg, type = "info") {
@@ -306,5 +312,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => elements.toast.classList.remove("show"), 3000);
     }
 
+    // เริ่มต้นการทำงานของแอปพลิเคชัน
     initialize();
 });
