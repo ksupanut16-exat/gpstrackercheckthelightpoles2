@@ -72,87 +72,43 @@
 
     .leaflet-div-icon { background: transparent !important; border: none !important; box-shadow: none !important; }
 
-    /* === FILTER UI === */
-    .filter-bar {
-      position: fixed; top: 70px; left: 15px;
-      display: flex; flex-wrap: wrap; gap: 8px;
+    /* ===================== FILTER UI (เฉพาะใน .top-controls) ===================== */
+    .top-controls{
+      position: fixed; top: 15px; left: 15px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      z-index: 2000;
+    }
+    /* ให้ปุ่มเดิมเลิก fixed แล้วปล่อยให้ .top-controls คุมตำแหน่ง */
+    .top-controls .track-btn{
+      position: static !important; left: auto !important; top: auto !important;
+    }
+    /* แถบกรองติดกับปุ่มเริ่มติดตาม (แถวเดียว, เลื่อนแนวนอนได้) */
+    .top-controls .filter-bar{
+      position: static !important;
+      display: flex; align-items: center; gap: 8px;
       background: rgba(255,255,255,0.95);
       padding: 8px 10px; border-radius: 10px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-      z-index: 2000;
-      max-width: min(92vw, 540px);
+      flex-wrap: nowrap; white-space: nowrap; overflow-x: auto;
+      max-width: 92vw;
     }
-    .filter-bar input {
-      border: 1px solid #ccc; border-radius: 6px;
-      padding: 6px 8px; font-size: 13px; width: 150px;
+    .top-controls .filter-bar input{
+      flex: 0 0 auto; width: 140px;
+      border: 1px solid #ccc; border-radius: 6px; padding: 6px 8px; font-size: 13px;
     }
-    .chip {
+    .top-controls .filter-bar .chip{ flex: 0 0 auto; }
+    .chip{
       border: 1px solid #ccc; background: #fff;
       padding: 6px 10px; border-radius: 999px; font-size: 13px; cursor: pointer;
       user-select: none;
     }
-    .chip.active { background: #111; color: #fff; border-color: #111; }
-    @media (max-width: 600px) {
-      .filter-bar { top: 70px; left: 12px; right: 12px; max-width: unset; }
-      .filter-bar input { flex: 1; min-width: 120px; }
+    .chip.active{ background:#111; color:#fff; border-color:#111; }
+    @media (max-width: 600px){
+      .top-controls{ gap: 8px; }
+      .top-controls .filter-bar{ max-width: 88vw; }
+      .top-controls .filter-bar input{ flex: 1; min-width: 120px; }
     }
-
-    /* กล่องรวมปุ่มบนมุมซ้าย */
-.top-controls{
-  position: fixed; top: 15px; left: 15px;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  z-index: 2000;
-}
-
-/* ให้ปุ่มเดิมเลิก fixed แล้วปล่อยให้ .top-controls คุมตำแหน่ง */
-.top-controls .track-btn{
-  position: static !important; left: auto !important; top: auto !important;
-}
-
-/* ย้าย filter-bar ให้ไม่ fixed แล้ววางติดกับปุ่มเริ่มติดตาม */
-.top-controls .filter-bar{
-  position: static !important;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255,255,255,0.95);
-  padding: 8px 10px;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-
-  /* สำคัญ: บังคับให้ปุ่ม/ช่องค้นหาอยู่บรรทัดเดียว */
-  flex-wrap: nowrap;         /* ไม่ให้ขึ้นบรรทัดใหม่ */
-  white-space: nowrap;       /* ป้องกันตกล่าง */
-  overflow-x: auto;          /* ถ้ามีไม่พอที่ → เลื่อนในแนวนอนได้ */
-  max-width: 92vw;           /* กว้างขึ้นกว่าของเดิม */
-}
-
-.top-controls .filter-bar input{
-  flex: 0 0 auto;            /* ไม่ยืดจนดันชิปตกบรรทัด */
-  width: 140px;              /* ลดกว้างนิดให้พอดีแถวเดียว */
-}
-
-.top-controls .filter-bar .chip{
-  flex: 0 0 auto;            /* ปุ่มไม่หด */
-}
-
-
-
-/* ชิปกรอง (เหมือนเดิม) */
-.chip{
-  border: 1px solid #ccc; background: #fff;
-  padding: 6px 10px; border-radius: 999px; font-size: 13px; cursor: pointer;
-  user-select: none;
-}
-.chip.active{ background:#111; color:#fff; border-color:#111; }
-
-@media (max-width: 600px){
-  .top-controls{ gap: 8px; }
-  .top-controls .filter-bar{ max-width: 88vw; }
-  .top-controls .filter-bar input{ flex: 1; min-width: 120px; }
-}
-
-    /* === /FILTER UI === */
+    /* ============================================================================ */
   </style>
 </head>
 <body>
@@ -161,25 +117,25 @@
     <input type="text" id="username" placeholder="ระบุชื่อผู้ตรวจ" />
   </div>
 
-  <!-- === FILTER UI === -->
   <!-- กล่องควบคุมมุมซ้ายบน -->
-<div class="top-controls">
-  <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
-<!-- แถบกรองชิดขวาปุ่ม -->
-  <div class="filter-bar">
-  <input type="text" id="searchInput" placeholder="ค้นหาชื่อเสา…" />
-  <button class="chip active" data-type="ALL">ทั้งหมด</button>
-  <button class="chip" data-type="POLE">เฉพาะเสาไฟ</button>
-  <button class="chip" data-type="SP">เฉพาะ SP</button>
-  <button class="chip" data-type="HM">เฉพาะ HM</button>
-  <button class="chip" data-type="ON">ไฟติด</button>
-  <button class="chip" data-type="OFF">ไฟดับ</button>
-</div>
-</div>
+  <div class="top-controls">
+    <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
 
-  <!-- === /FILTER UI === -->
+    <!-- แถบกรองชิดขวาปุ่ม -->
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="ค้นหาชื่อเสา…" />
+      <button class="chip active" data-type="ALL">ทั้งหมด</button>
+      <button class="chip" data-type="POLE">เฉพาะเสาไฟ</button>
+      <button class="chip" data-type="SP">เฉพาะ SP</button>
+      <button class="chip" data-type="HM">เฉพาะ HM</button>
+      <button class="chip" data-type="ON">ไฟติด</button>
+      <button class="chip" data-type="OFF">ไฟดับ</button>
+    </div>
+  </div>
 
-  <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button>
+  <!-- ❌ ลบปุ่ม trackBtn ตัวที่ซ้ำออก (เหลือแค่ใน .top-controls) -->
+  <!-- <button id="trackBtn" class="track-btn">▶️ เริ่มติดตาม</button> -->
+
   <button id="refreshBtn" class="refresh-btn">🔄 อัปเดตตอนนี้</button>
   <div id="map"></div>
   <div id="status" class="status-bar">🕓 กำลังโหลดแผนที่...</div>
@@ -203,7 +159,7 @@
     /* ===== CONFIG ===== */
     const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec";
     const PROXY = "https://corsproxy.io/?";
-    const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc"; // ปรับเป็นของคุณได้
+    const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
     const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
     /* ===== TUNING ===== */
@@ -215,25 +171,28 @@
     const PER_PIN_COOLDOWN_MS = 90_000;
     const GLOBAL_COOLDOWN_MS  = 6_000;
     const AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING = true;
-   /* ===== NAME FALLBACKS (กรณีคอลัมน์ Name ว่าง) ===== */
-   const NAME_FALLBACK_SET = new Set(["SP01","SO02","SP03","HM01","HM02","HM03"]);
-   const toId = (x) => (x ?? "").toString().trim().toUpperCase(); // แปลงเป็นตัวพิมพ์ใหญ่ ตัดช่องว่าง
-    // === Helpers สำหรับดึงรหัสเสาจากสตริง (เช่น SP5, SP-05, SP 005, HM12, SO2) ===
-function extractCode(str) {
-  const s = (str ?? "").toString().trim();
-  if (!s) return null;
-  // จับ SP/HM/SO ตามด้วยตัวเลข 1–4 หลัก (รองรับมีเว้นวรรค/ขีด/ศูนย์นำหน้า)
-  const m = s.toUpperCase().match(/\b(SP|HM|SO)\s*[- ]?\s*0*(\d{1,4})\b/);
-  return m ? `${m[1]}${m[2]}` : null; // ไม่เติมศูนย์นำหน้าเพิ่ม เพื่อคงรูปแบบเรียบง่าย (SP5 ก็ SP5)
-}
 
-function deriveName(nameRaw, statusRaw) {
-  const nameTxt = (nameRaw ?? "").toString().trim();
-  if (nameTxt) return nameTxt;            // ถ้า name มีค่าอยู่แล้ว ใช้เลย
-  const codeFromStatus = extractCode(statusRaw);
-  return codeFromStatus || "";            // ถ้า name ว่าง → ลองดึงจาก status
-}
-/* ===== ===== */
+    /* ===== Fallback/Extract รหัสเสา ===== */
+    const NAME_FALLBACK_SET = new Set(["SP01","SO02","SP03","HM01","HM02","HM03"]);
+    const toId = (x) => (x ?? "").toString().trim().toUpperCase();
+
+    function extractCode(str) {
+      const s = (str ?? "").toString().trim();
+      if (!s) return null;
+      const m = s.toUpperCase().match(/\b(SP|HM|SO)\s*[- ]?\s*0*(\d{1,4})\b/);
+      return m ? `${m[1]}${m[2]}` : null;
+    }
+    function deriveName(nameRaw, statusRaw) {
+      const nameTxt = (nameRaw ?? "").toString().trim();
+      if (nameTxt) return nameTxt;
+      // ก่อนใช้ regex ลองจากเซ็ตคงที่ (กันเคสข้อความสั้น ๆ)
+      const idFromStatus = toId(statusRaw);
+      if (NAME_FALLBACK_SET.has(idFromStatus)) return idFromStatus;
+      const codeFromStatus = extractCode(statusRaw);
+      return codeFromStatus || "";
+    }
+
+    /* ===== ===== */
     window.onload = () => {
       const map = L.map('map').setView([13.736717, 100.523186], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
@@ -248,7 +207,7 @@ function deriveName(nameRaw, statusRaw) {
       /* === FILTER refs/state === */
       const searchInput = document.getElementById("searchInput");
       const chipButtons = Array.from(document.querySelectorAll(".chip"));
-      let activeTypeFilter = "ALL"; // ALL | SP | HM | ON | OFF
+      let activeTypeFilter = "ALL"; // ALL | POLE | SP | HM | ON | OFF
       let searchQuery = "";
       /* === /FILTER refs/state === */
 
@@ -273,7 +232,6 @@ function deriveName(nameRaw, statusRaw) {
         toast.classList.add("show");
         setTimeout(() => toast.classList.remove("show"), 3000);
       }
-
       function toNumber(x) {
         if (typeof x === "number") return x;
         if (typeof x === "string") {
@@ -283,43 +241,36 @@ function deriveName(nameRaw, statusRaw) {
         }
         return NaN;
       }
-      function toText(x) {
-        return (x ?? "").toString().trim();
-      }
-      
-     // ตรวจ prefix (SP/HM) ให้ทนทุกรูปแบบ: "SP01", "sp 01", "SP-01", " HM12 " ฯลฯ
-function getCodePrefix(x){
-  const s = (x ?? "").toString().trim().toUpperCase();
-  if (!s) return null;
-  // จับกรณีขึ้นต้นด้วย SP/HM ตรงๆ
-  let m = s.match(/^(SP|HM)\b/);
-  if (m) return m[1];
-  // จับกรณีมีตัวคั่น/เว้นวรรคก่อนตัวเลข
-  m = s.match(/\b(SP|HM)\s*[- ]?\s*\d+/);
-  return m ? m[1] : null;
-}
-function isSP(x){ return getCodePrefix(x) === "SP"; }
-function isHM(x){ return getCodePrefix(x) === "HM"; }
+      function toText(x) { return (x ?? "").toString().trim(); }
 
-      
+      // ตรวจ prefix (SP/HM) ให้ทนหลายรูปแบบ
+      function getCodePrefix(x){
+        const s = (x ?? "").toString().trim().toUpperCase();
+        if (!s) return null;
+        let m = s.match(/^(SP|HM)\b/);
+        if (m) return m[1];
+        m = s.match(/\b(SP|HM)\s*[- ]?\s*\d+/);
+        return m ? m[1] : null;
+      }
+      function isSP(x){ return getCodePrefix(x) === "SP"; }
+      function isHM(x){ return getCodePrefix(x) === "HM"; }
+
       // ใช้สีจากสถานะก่อน; ถ้าสถานะว่างให้ fallback จากชื่อ (SP/HM)
       function colorFor(status, name) {
         const s = toText(status);
         const nm = toText(name);
-        if (/^SP/i.test(s) || /^SP/i.test(nm)) return "#ff66b2"; // ชมพู
-        if (/^HM/i.test(s) || /^HM/i.test(nm)) return "#ffd54f"; // เหลือง
+        if (/^SP/i.test(s) || /^SP/i.test(nm)) return "#ff66b2";
+        if (/^HM/i.test(s) || /^HM/i.test(nm)) return "#ffd54f";
         if (/ไฟดับ/i.test(s)) return "red";
         if (/ไฟติด/i.test(s)) return "green";
         return "blue";
       }
-
       function circleIcon(color) {
         return L.divIcon({
           html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>`,
           className: ""
         });
       }
-
       function sendStatusToSheet(name, newStatus) {
         const fullURL = PROXY + encodeURIComponent(WEBHOOK_URL);
         const user = usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
@@ -357,11 +308,11 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
             statusTextEl.style.color = newColor;
             statusTextEl.textContent = newStatus;
             marker.setIcon(circleIcon(newColor));
-            marker.options.status = newStatus;            // ★ อัปเดตสถานะเก็บไว้ที่ marker (ใช้กับตัวกรอง)
+            marker.options.status = newStatus;
             ding.currentTime = 0; ding.play();
             marker.closePopup();
             sendStatusToSheet(name, newStatus);
-            applyFilters();                                // ★ รีเฟรชผลกรองเมื่อสถานะเปลี่ยน
+            applyFilters();
           }
           div.querySelector("#onA").onclick  = () => updateStatus("ไฟติดA");
           div.querySelector("#onB").onclick  = () => updateStatus("ไฟติดB");
@@ -386,36 +337,34 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
           const rows = json.table.rows;
 
           rows.forEach((r, i) => {
-  // อ่านค่าพร้อมสำรองจาก .f (formatted) เผื่อ .v ว่าง
-  const rawName   = r.c[0]?.v ?? r.c[0]?.f;   // คอลัมน์ Name
-  const rawLat    = r.c[1]?.v ?? r.c[1]?.f;   // Latitude
-  const rawLng    = r.c[2]?.v ?? r.c[2]?.f;   // Longitude
-  const rawStatus = r.c[8]?.v ?? r.c[8]?.f;   // Status (ถ้าคอลัมน์เปลี่ยน อย่าลืมปรับ index)
+            // อ่านค่าพร้อมสำรองจาก .f (formatted) เผื่อ .v ว่าง
+            const rawName   = r.c[0]?.v ?? r.c[0]?.f;   // Name
+            const rawLat    = r.c[1]?.v ?? r.c[1]?.f;   // Latitude
+            const rawLng    = r.c[2]?.v ?? r.c[2]?.f;   // Longitude
+            const rawStatus = r.c[8]?.v ?? r.c[8]?.f;   // Status (ถ้าคอลัมน์เปลี่ยน ปรับ index นี้)
 
-  const latNum = toNumber(rawLat);
-  const lngNum = toNumber(rawLng);
-  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-    console.warn(`[skip row ${i}] invalid lat/lng`, { rawName, rawLat, rawLng });
-    return;
-  }
+            const latNum = toNumber(rawLat);
+            const lngNum = toNumber(rawLng);
+            if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+              console.warn(`[skip row ${i}] invalid lat/lng`, { rawName, rawLat, rawLng });
+              return;
+            }
 
-  // ★ ถ้า name ว่าง ให้พยายามดึงจาก status แบบอัตโนมัติ (รองรับ SP ตามด้วยตัวเลขทุกตัว)
-  const name   = deriveName(rawName, rawStatus);
-  const status = toText(rawStatus);
+            // ถ้า name ว่าง ให้พยายามดึงจาก status แบบอัตโนมัติ (รองรับ SP/HM/ฯลฯ ตามด้วยตัวเลข)
+            const name   = deriveName(rawName, rawStatus);
+            const status = toText(rawStatus);
 
-  const color = colorFor(status, name);
-  const m = L.marker([latNum, lngNum], {
-    icon: circleIcon(color),
-    name,           // ← name หลังเติมแล้ว
-    status          // เก็บสถานะไว้เหมือนเดิม
-  }).addTo(map);
+            const color = colorFor(status, name);
+            const m = L.marker([latNum, lngNum], {
+              icon: circleIcon(color),
+              name,
+              status
+            }).addTo(map);
 
-  createPopup(m, name, status, color);
-  markers.push(m);
-  markerByName.set(name || `row_${i}`, m); // กันกรณีชื่อยังว่างจริง ๆ (หา code ไม่เจอ)
-});
-
-
+            createPopup(m, name, status, color);
+            markers.push(m);
+            markerByName.set(name || `row_${i}`, m);
+          });
 
           if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
             map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
@@ -423,8 +372,7 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
           }
 
           statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
-
-          applyFilters(); // ★ ใช้ตัวกรองกับชุดข้อมูลที่เพิ่งโหลด
+          applyFilters();
         } catch (e) {
           console.error(e);
           statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
@@ -518,13 +466,11 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
         let nearest = null;
         let nearestDist = Infinity;
 
-        // ★ คำนวณเฉพาะหมุดที่ "มองเห็นอยู่" หลังกรองแล้ว
+        // คำนวณเฉพาะหมุดที่ "มองเห็นอยู่" หลังกรองแล้ว
         for (const m of markers) {
           if (!map.hasLayer(m)) continue;
           const d = map.distance(latlng, m.getLatLng());
-          if (d < nearestDist) {
-            nearest = m; nearestDist = d;
-          }
+          if (d < nearestDist) { nearest = m; nearestDist = d; }
         }
         if (!nearest) return;
 
@@ -543,7 +489,6 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
           ding.currentTime = 0; ding.play();
           showToast(`📡 ใกล้จุด ${name} ระยะ ${nearestDist.toFixed(1)} ม.`, "info");
         }
-
         if (nearestDist >= ZOOM_OUT_DIST_M && isZoomedIn) {
           isZoomedIn = false;
         }
@@ -551,19 +496,19 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
 
       /* === FILTER logic === */
       function markerPassTypeFilter(m) {
-  const name = (m.options.name || "");
-  const st   = (m.options.status || "");
+        const name = (m.options.name || "");
+        const st   = (m.options.status || "");
 
-  switch (activeTypeFilter) {
-    case "SP":   return isSP(name) || isSP(st);        // เผื่อกรณี name ว่าง ใช้สถานะช่วย
-    case "HM":   return isHM(name) || isHM(st);
-    case "ON":   return /ไฟติด/i.test(st);
-    case "OFF":  return /ไฟดับ/i.test(st);
-    case "POLE": // ★ เฉพาะ “เสาไฟ” = ไม่ใช่ SP/HM
-      return !(isSP(name) || isHM(name) || isSP(st) || isHM(st));
-    default:     return true; // ALL
-  }
-}
+        switch (activeTypeFilter) {
+          case "SP":   return isSP(name) || isSP(st);
+          case "HM":   return isHM(name) || isHM(st);
+          case "ON":   return /ไฟติด/i.test(st);
+          case "OFF":  return /ไฟดับ/i.test(st);
+          case "POLE": // เฉพาะ “เสาไฟ” = ไม่ใช่ SP/HM
+            return !(isSP(name) || isHM(name) || isSP(st) || isHM(st));
+          default:     return true; // ALL
+        }
+      }
       function markerPassSearch(m) {
         if (!searchQuery) return true;
         const name = (m.options.name || "").toLowerCase();
@@ -580,7 +525,6 @@ function isHM(x){ return getCodePrefix(x) === "HM"; }
           }
         });
       }
-      // events
       chipButtons.forEach(btn => {
         btn.addEventListener("click", () => {
           activeTypeFilter = btn.dataset.type;
