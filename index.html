@@ -101,10 +101,9 @@
 
   <script>
     /* ===== CONFIG ===== */
-    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec";
-    const PROXY = "https://corsproxy.io/?";
-    const SHEET_ID = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
-    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+    const SHEET_ID   = "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc";
+const SHEET_TAB  = "Inspections"; // <- เปลี่ยนเป็นชื่อแท็บของคุณ
+const SHEET_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_TAB)}`;
 
     /* ===== TUNING ===== */
     const MIN_STEP_M = 2;                 // บันทึกจุดใหม่เมื่อขยับเกิน 2 เมตร
@@ -148,14 +147,15 @@
         setTimeout(() => toast.classList.remove("show"), 3000);
       }
 
-      function colorForStatus(status) {
-        if (!status) return "blue";
-        if (/^SP/i.test(status)) return "#ff66b2";
-        if (/^HM/i.test(status)) return "#ffd54f";
-        if (/ไฟดับ/i.test(status)) return "red";
-        if (/ไฟติด/i.test(status)) return "green";
-        return "blue";
-      }
+      function colorFor(status, name) {
+  const s = (status || "").toString().trim();
+  const n = (name   || "").toString().trim();
+  if (/ไฟดับ/i.test(s)) return "red";
+  if (/ไฟติด/i.test(s)) return "green";
+  if (/^SP/i.test(s) || (!s && /^SP/i.test(n))) return "#ff66b2"; // SP = ชมพู
+  if (/^HM/i.test(s) || (!s && /^HM/i.test(n))) return "#ffd54f"; // HM = เหลือง
+  return "blue";
+}
 
       function circleIcon(color) {
         return L.divIcon({
@@ -215,42 +215,62 @@
       }
 
       async function loadSheetData() {
-        try {
-          const res = await fetch(SHEET_URL);
-          const text = await res.text();
+  try {
+    const res  = await fetch(SHEET_URL);
+    const text = await res.text();
+    // เคลียร์เก่า
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    markerByName.clear();
 
-          // ล้าง markers เก่า (ง่าย/เสถียร) — รีเฟรชทุก 5 นาที ผลกระทบต่ำ
-          markers.forEach(m => map.removeLayer(m));
-          markers = [];
-          markerByName.clear();
+    const json = JSON.parse(text.substring(47).slice(0, -2));
 
-          const json = JSON.parse(text.substring(47).slice(0, -2));
-          const rows = json.table.rows;
+    // หา index ของคอลัมน์จากชื่อหัวคอลัมน์ (รองรับไทย/อังกฤษ)
+    const cols = json.table.cols.map(c => (c.label || c.id || "").toString().trim().toLowerCase());
+    const nameIdx   = cols.findIndex(c => /^(name|ชื่อ)/i.test(c));
+    const latIdx    = cols.findIndex(c => /(lat|latitude|ละติจูด)/i.test(c));
+    const lngIdx    = cols.findIndex(c => /(lng|lon|longitude|ลองจิจูด)/i.test(c));
+    const statusIdx = cols.findIndex(c => /(status|สถานะ)/i.test(c));
 
-          rows.forEach(r => {
-            const name   = r.c[0]?.v;
-            const lat    = r.c[1]?.v;
-            const lng    = r.c[2]?.v;
-            const status = r.c[8]?.v || ""; // คอลัมน์ Status
-            if (name && lat && lng) {
-              const color = colorForStatus(status);
-              const m = L.marker([lat, lng], { icon: circleIcon(color), name }).addTo(map);
-              createPopup(m, name, status, color);
-              markers.push(m);
-              markerByName.set(name, m);
-            }
-          });
+    if (nameIdx < 0 || latIdx < 0 || lngIdx < 0) {
+      statusEl.textContent = "❌ หา Name/Latitude/Longitude ไม่เจอในหัวตาราง";
+      return;
+    }
 
-          if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
-            map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
-            firstDataLoaded = true;
-          }
-          statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
-        } catch (e) {
-          console.error(e);
-          statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
-        }
-      }
+    const rows = json.table.rows;
+    let added = 0;
+
+    rows.forEach(r => {
+      const name = r.c[nameIdx]?.v;
+      const latRaw = r.c[latIdx]?.v;
+      const lngRaw = r.c[lngIdx]?.v;
+      const status = statusIdx >= 0 ? (r.c[statusIdx]?.v || "") : "";
+
+      // แปลงเป็นตัวเลขอย่างปลอดภัย (รองรับกรณีเป็นสตริง)
+      const lat = typeof latRaw === "number" ? latRaw : parseFloat(String(latRaw).replace(",", "."));
+      const lng = typeof lngRaw === "number" ? lngRaw : parseFloat(String(lngRaw).replace(",", "."));
+
+      if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const color = colorFor(status, name);
+      const m = L.marker([lat, lng], { icon: circleIcon(color), name }).addTo(map);
+
+      createPopup(m, name, status, color);
+      markers.push(m);
+      markerByName.set(name, m);
+      added++;
+    });
+
+    if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
+      map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
+      firstDataLoaded = true;
+    }
+    statusEl.innerHTML = `✅ อัปเดตล่าสุด: ${new Date().toLocaleTimeString()} — โหลด ${added}/${rows.length} แถว`;
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
+  }
+}
 
       function startTracking() {
         if (watchID) return;
