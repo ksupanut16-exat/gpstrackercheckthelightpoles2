@@ -325,57 +325,107 @@
           div.querySelector("#offAB").onclick= () => updateStatus("ไฟดับAB");
         });
       }
+// หา index ของคอลัมน์จาก label (หัวตาราง) แบบไม่สนภาษา/ช่องว่าง/ตัวพิมพ์
+function colIndexByLabels(cols, candidates){
+  return cols.findIndex(c => {
+    const label = (c?.label ?? "").toString().trim().toLowerCase();
+    return candidates.some(x => label === x.toLowerCase());
+  });
+}
 
-      async function loadSheetData() {
-        try {
-          const res = await fetch(SHEET_URL);
-          const text = await res.text();
+// อ่านค่าจากเซลล์: เอา v ก่อน ถ้าไม่มีค่อยลอง f
+function cell(r, idx){
+  return r?.c?.[idx]?.v ?? r?.c?.[idx]?.f ?? "";
+}
 
-          // ล้าง markers เก่า
-          markers.forEach(m => map.removeLayer(m));
-          markers = [];
-          markerByName.clear();
+     async function loadSheetData() {
+  try {
+    const res = await fetch(SHEET_URL);
+    const text = await res.text();
 
-          const json = JSON.parse(text.substring(47).slice(0, -2));
-          const rows = json.table.rows;
+    // ล้าง markers เก่า
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    markerByName.clear();
 
-          rows.forEach((r, i) => {
-            const rawName   = r.c[0]?.v ?? r.c[0]?.f;   // Name
-            const rawLat    = r.c[1]?.v ?? r.c[1]?.f;   // Latitude
-            const rawLng    = r.c[2]?.v ?? r.c[2]?.f;   // Longitude
-            const rawStatus = r.c[8]?.v ?? r.c[8]?.f;   // Status (ถ้าคอลัมน์เปลี่ยน ปรับ index)
+    const json = JSON.parse(text.substring(47).slice(0, -2));
+    const rows = json.table.rows;
+    const cols = json.table.cols;
 
-            const latNum = toNumber(rawLat);
-            const lngNum = toNumber(rawLng);
-            if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return;
+    // แม็พคอลัมน์ตามหัวตารางของคุณ
+    const COL = {
+      name:        colIndexByLabels(cols, ["name","ชื่อ","ชื่อเสา"]),
+      lat:         colIndexByLabels(cols, ["latitude","lat","ละติจูด"]),
+      lng:         colIndexByLabels(cols, ["longitude","lng","ลองจิจูด"]),
+      lastFix:     colIndexByLabels(cols, ["การซ่อมล่าสุด"]),
+      item:        colIndexByLabels(cols, ["รายการ"]),
+      mechanic:    colIndexByLabels(cols, ["ผู้ซ่อม"]),
+      photo:       colIndexByLabels(cols, ["รูปถ่ายหน้างาน","รูปถ่าย"]),
+      ticket:      colIndexByLabels(cols, ["ใบแจ้งงาน"]),
+      status:      colIndexByLabels(cols, ["status","สถานะ"]),
+      lastEditor:  colIndexByLabels(cols, ["ผู้แก้ไขล่าสุด"]),
+      lastUpdated: colIndexByLabels(cols, ["วันที่อัปเดตล่าสุด","อัปเดตล่าสุด"]),
+      direction:   colIndexByLabels(cols, ["ทิศทาง","ทิศ"])
+    };
 
-            const name   = deriveName(rawName, rawStatus);
-            const status = toText(rawStatus);
+    // fallback ขั้นต่ำ (กันกรณีหัวตารางพิมพ์ไม่ตรง)
+    if (COL.name   < 0) COL.name = 0;
+    if (COL.lat    < 0) COL.lat = 1;
+    if (COL.lng    < 0) COL.lng = 2;
+    if (COL.status < 0) COL.status = 8;
 
-            const color = colorFor(status, name);
-            const m = L.marker([latNum, lngNum], {
-              icon: circleIcon(color),
-              name,
-              status
-            }).addTo(map);
+    rows.forEach((r, i) => {
+      const rawName   = cell(r, COL.name);
+      const rawLat    = cell(r, COL.lat);
+      const rawLng    = cell(r, COL.lng);
+      const rawStatus = cell(r, COL.status);
 
-            createPopup(m, name, status, color);
-            markers.push(m);
-            markerByName.set(name || `row_${i}`, m);
-          });
+      const name   = toText(rawName);
+      const status = toText(rawStatus);
+      const latNum = toNumber(rawLat);
+      const lngNum = toNumber(rawLng);
 
-          if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
-            map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
-            firstDataLoaded = true;
-          }
-
-          statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
-          applyFilters();
-        } catch (e) {
-          console.error(e);
-          statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
-        }
+      if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+        console.warn(`[skip row ${i}] invalid lat/lng`, { name, rawLat, rawLng });
+        return;
       }
+
+      const color = colorFor(status, name);
+      const m = L.marker([latNum, lngNum], {
+        icon: circleIcon(color),
+        name,
+        status,
+        // เก็บข้อมูลเสริมไว้ด้วย (เผื่ออยากใช้ใน popup เพิ่มทีหลัง)
+        meta: {
+          lastFix:     cell(r, COL.lastFix),
+          item:        cell(r, COL.item),
+          mechanic:    cell(r, COL.mechanic),
+          photo:       cell(r, COL.photo),
+          ticket:      cell(r, COL.ticket),
+          lastEditor:  cell(r, COL.lastEditor),
+          lastUpdated: cell(r, COL.lastUpdated),
+          direction:   cell(r, COL.direction),
+        }
+      }).addTo(map);
+
+      createPopup(m, name, status, color);
+      markers.push(m);
+      markerByName.set(name || `row_${i}`, m);
+    });
+
+    if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
+      map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
+      firstDataLoaded = true;
+    }
+
+    statusEl.innerHTML = "✅ อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
+    applyFilters();
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "❌ โหลดข้อมูลไม่สำเร็จ";
+  }
+}
+
 
       function startTracking() {
         if (watchID) return;
