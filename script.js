@@ -8,19 +8,18 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const CONFIG = {
         WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbxIPNhZzcPduLQONpuaiMNYP028ZvIZld6_s_mg5x1QFCOEKPF76jDs9RTyq01jbcglTg/exec",
-        // หมายเหตุ: การใช้ Proxy ควรเป็นทางเลือกสุดท้าย ควรไปแก้ที่ Google Apps Script ให้รองรับ CORS จะดีที่สุด
         PROXY_URL: "https://corsproxy.io/?",
         SHEET_ID: "1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc",
         // https://docs.google.com/spreadsheets/d/1KTFaGCzmtjJtezumsWDXFdsWlpZtSriq2mEHe-ujGNc/edit?usp=sharing
         // อยู่ที่ K.supanut ChatGpt 061068
-        UPDATE_INTERVAL: 300000, // อัปเดตข้อมูลจาก Sheet ทุก 5 นาที (300,000 ms)
-        ALERT_DISTANCE: 10, // ระยะที่จะแจ้งเตือนเมื่อเข้าใกล้จุด (เมตร)
-        RESET_DISTANCE: 20, // ระยะที่จะรีเซ็ตสถานะการซูม (เมตร)
-        CHECK_NEARBY_THROTTLE: 2000, // ตรวจสอบจุดใกล้เคียงทุกๆ 2 วินาที (ลดภาระการทำงาน)
+        UPDATE_INTERVAL: 300000, 
+        ALERT_DISTANCE: 10,
+        RESET_DISTANCE: 20,
+        CHECK_NEARBY_THROTTLE: 2000,
         DEFAULT_ZOOM: 13,
         TRACKING_ZOOM: 17,
         NEARBY_ZOOM: 19,
-        INITIAL_LAT_LNG: [13.736717, 100.523186], // ตำแหน่งเริ่มต้น (กรุงเทพ)
+        INITIAL_LAT_LNG: [13.736717, 100.523186],
     };
 
     /**
@@ -30,14 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const state = {
         map: null,
-        sheetMarkers: new Map(), // ใช้ Map เพื่อให้จัดการง่ายขึ้น
+        sheetMarkers: new Map(),
         userMarker: null,
         userCircle: null,
         userPath: [],
         userPolyline: null,
         watchID: null,
         isZoomedToMarker: false,
-        isCheckingNearby: false, // สำหรับ Throttling
+        isCheckingNearby: false,
     };
 
     /**
@@ -62,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * ===================================================================
      */
 
-    // ฟังก์ชันเริ่มต้นการทำงานทั้งหมด
     function initialize() {
         initMap();
         bindEvents();
@@ -70,20 +68,17 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(loadSheetData, CONFIG.UPDATE_INTERVAL);
     }
 
-    // สร้างแผนที่
     function initMap() {
         state.map = L.map(elements.mapContainer).setView(CONFIG.INITIAL_LAT_LNG, CONFIG.DEFAULT_ZOOM);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
         elements.status.textContent = "✅ โหลดแผนที่สำเร็จ";
     }
 
-    // ผูก Event Listener กับปุ่มต่างๆ
     function bindEvents() {
         elements.trackBtn.addEventListener('click', toggleTracking);
         elements.refreshBtn.addEventListener('click', loadSheetData);
     }
 
-    // โหลดข้อมูลจาก Google Sheet
     async function loadSheetData() {
         elements.status.textContent = "🔄 กำลังโหลดข้อมูลเสาไฟ...";
         const sheetURL = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json`;
@@ -92,7 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = await response.text();
             const json = JSON.parse(text.substring(47).slice(0, -2));
             
-            // ล้าง Marker เก่าที่ไม่มีในข้อมูลใหม่
             const newMarkerNames = new Set(json.table.rows.map(r => r.c[0]?.v));
             for (const [name, marker] of state.sheetMarkers.entries()) {
                 if (!newMarkerNames.has(name)) {
@@ -120,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // สร้างหรืออัปเดต Marker บนแผนที่
     function updateMarker(name, lat, lng, status) {
         const color = getColorForStatus(status);
         const icon = L.divIcon({ html: `<div style='background:${color};width:18px;height:18px;border-radius:50%;border:2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);'></div>` });
@@ -128,19 +121,16 @@ document.addEventListener('DOMContentLoaded', () => {
         let marker = state.sheetMarkers.get(name);
 
         if (marker) {
-            // อัปเดตตำแหน่งและไอคอนถ้ามีอยู่แล้ว
             marker.setLatLng([lat, lng]);
             marker.setIcon(icon);
-            marker.options.status = status; // เก็บ status ปัจจุบัน
+            marker.options.status = status;
         } else {
-            // สร้างใหม่ถ้ายังไม่มี
             marker = L.marker([lat, lng], { icon, name, status }).addTo(state.map);
             state.sheetMarkers.set(name, marker);
             bindPopupToMarker(marker);
         }
     }
 
-    // ผูก Popup กับ Marker (แยกฟังก์ชันออกมาเพื่อความสะอาด)
     function bindPopupToMarker(marker) {
         const popupContent = `
             <b>${marker.options.name}</b><br>
@@ -162,34 +152,27 @@ document.addEventListener('DOMContentLoaded', () => {
             popupNode.querySelectorAll(".btn").forEach(btn => {
                 btn.addEventListener('click', () => {
                     const newStatus = btn.dataset.status;
-                    const newColor = getColorForStatus(newStatus);
-
-                    // อัปเดต UI ทันที
                     marker.options.status = newStatus;
+                    const newColor = getColorForStatus(newStatus);
                     marker.setIcon(L.divIcon({ html: `<div style='background:${newColor};width:18px;height:18px;border-radius:50%;border:2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);'></div>` }));
-                    
                     elements.ding.currentTime = 0;
                     elements.ding.play();
                     marker.closePopup();
-
-                    // ส่งข้อมูลไป Sheet
                     sendStatusToSheet(marker.options.name, newStatus);
                 });
             });
         });
     }
     
-    // ส่งสถานะไปที่ Google Sheet
     async function sendStatusToSheet(name, newStatus) {
         const fullURL = CONFIG.PROXY_URL + encodeURIComponent(CONFIG.WEBHOOK_URL);
         const user = elements.usernameInput.value.trim() || "ไม่ระบุผู้ตรวจ";
         try {
-            const response = await fetch(fullURL, {
+            await fetch(fullURL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, status: newStatus, user })
             });
-            await response.json();
             showToast(`✅ บันทึก "${newStatus}" แล้ว (${name})`, "success");
         } catch (error) {
             console.error("เกิดข้อผิดพลาดในการบันทึก:", error);
@@ -197,16 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // สลับการติดตาม (เปิด/ปิด)
     function toggleTracking() {
-        if (state.watchID) {
-            stopTracking();
-        } else {
-            startTracking();
-        }
+        state.watchID ? stopTracking() : startTracking();
     }
 
-    // เริ่มการติดตามตำแหน่ง
     function startTracking() {
         if (!navigator.geolocation) {
             showToast("เบราว์เซอร์ของคุณไม่รองรับ Geolocation", "error");
@@ -216,31 +193,26 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast("🚀 เริ่มติดตามตำแหน่ง...", "success");
         elements.trackBtn.textContent = "⏸️ หยุดติดตาม";
         elements.trackBtn.classList.add("stop");
-        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(err => console.log(err.message));
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
         
         const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
         state.watchID = navigator.geolocation.watchPosition(updatePosition, handleLocationError, options);
     }
     
-    // หยุดการติดตามตำแหน่ง
     function stopTracking() {
         if (!state.watchID) return;
-        
         navigator.geolocation.clearWatch(state.watchID);
         state.watchID = null;
         elements.trackBtn.textContent = "▶️ เริ่มติดตาม";
         elements.trackBtn.classList.remove("stop");
         showToast("🛑 หยุดติดตามแล้ว", "info");
-
-        if (document.fullscreenElement) document.exitFullscreen().catch(err => console.log(err.message));
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     }
 
-    // Callback เมื่อตำแหน่งมีการอัปเดต
     function updatePosition(pos) {
         const { latitude, longitude, accuracy } = pos.coords;
         const latLng = [latitude, longitude];
 
-        // --- IMPROVEMENT: อัปเดตตำแหน่ง marker เดิม แทนการสร้างใหม่ ---
         if (!state.userMarker) {
             state.userMarker = L.marker(latLng, { icon: L.divIcon({ html: "📍", iconSize: [24, 24] }) }).addTo(state.map);
             state.userCircle = L.circle(latLng, { radius: accuracy }).addTo(state.map);
@@ -250,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
             state.userCircle.setRadius(accuracy);
         }
 
-        // --- IMPROVEMENT: เพิ่มจุดใหม่ในเส้นทางเดิม แทนการวาดใหม่ทั้งหมด ---
         state.userPath.push(latLng);
         if (!state.userPolyline) {
             state.userPolyline = L.polyline(state.userPath, { color: "#007bff", weight: 4 }).addTo(state.map);
@@ -259,12 +230,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         state.map.setView(latLng, Math.max(state.map.getZoom(), CONFIG.TRACKING_ZOOM));
-        
-        // --- IMPROVEMENT: เรียกใช้ฟังก์ชันเช็คระยะแบบ Throttling ---
         throttledCheckNearby(latLng);
     }
     
-    // Callback เมื่อเกิดข้อผิดพลาดในการระบุตำแหน่ง
     function handleLocationError(error) {
         stopTracking();
         elements.trackBtn.disabled = true;
@@ -276,15 +244,13 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast(message, "error");
     }
 
-    // --- NEW: ฟังก์ชันตรวจสอบระยะห่าง (แบบ Throttling) ---
     function throttledCheckNearby(userLatLng) {
-        if (state.isCheckingNearby) return; // ถ้ากำลังตรวจสอบอยู่ ให้ออกไปก่อน
+        if (state.isCheckingNearby) return;
         state.isCheckingNearby = true;
         
         let closestMarker = null;
         let minDistance = Infinity;
 
-        // วนลูปหา Marker ที่ใกล้ที่สุด
         for (const marker of state.sheetMarkers.values()) {
             const dist = state.map.distance(userLatLng, marker.getLatLng());
             if (dist < minDistance) {
@@ -293,14 +259,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // อัปเดต UI แสดงระยะห่าง
         if (closestMarker) {
             elements.distanceInfo.textContent = `ห่างจาก ${closestMarker.options.name}: ${minDistance.toFixed(0)} ม.`;
-        } else {
-            elements.distanceInfo.textContent = "ไม่พบเสาไฟในบริเวณนี้";
         }
         
-        // ตรวจสอบเงื่อนไขการซูมและแจ้งเตือน
         if (minDistance < CONFIG.ALERT_DISTANCE && !state.isZoomedToMarker) {
             state.isZoomedToMarker = true;
             state.map.setView(closestMarker.getLatLng(), CONFIG.NEARBY_ZOOM, { animate: true });
@@ -309,13 +271,10 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.ding.play();
             showToast(`📡 ใกล้จุด ${closestMarker.options.name} ระยะ ${minDistance.toFixed(1)} ม.`, "info");
         } else if (minDistance >= CONFIG.RESET_DISTANCE && state.isZoomedToMarker) {
-            state.isZoomedToMarker = false; // รีเซ็ตสถานะเมื่อออกห่างจากจุด
+            state.isZoomedToMarker = false;
         }
 
-        // ปลดล็อค Throttling หลังจากเวลาที่กำหนด
-        setTimeout(() => {
-            state.isCheckingNearby = false;
-        }, CONFIG.CHECK_NEARBY_THROTTLE);
+        setTimeout(() => { state.isCheckingNearby = false; }, CONFIG.CHECK_NEARBY_THROTTLE);
     }
     
 
@@ -325,21 +284,19 @@ document.addEventListener('DOMContentLoaded', () => {
      * ===================================================================
      */
 
-    // คืนค่าสีตามสถานะ
     function getColorForStatus(status) {
-        if (!status) return "#8e44ad"; // สีม่วงสำหรับสถานะว่าง
-        const s = status.toLowerCase();
+        if (!status) return "#8e44ad";
+        const s = status.trim().toLowerCase(); // <-- แก้ไขจุดนี้แล้ว
         if (s.startsWith("sp")) return "#ff66b2";
         if (s.startsWith("hm")) return "#ffd54f";
         if (s.includes("ดับ")) return "#dc3545";
         if (s.includes("ติด")) return "#28a745";
-        return "#3498db"; // สีน้ำเงินสำหรับสถานะอื่นๆ
+        return "#3498db";
     }
     
-    // แสดงข้อความ Toast
     function showToast(msg, type = "info") {
         elements.toast.textContent = msg;
-        elements.toast.className = "toast show"; // Reset classes
+        elements.toast.className = "toast show";
         switch (type) {
             case "success": elements.toast.style.background = "#28a745"; break;
             case "error": elements.toast.style.background = "#dc3545"; break;
@@ -348,6 +305,5 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => elements.toast.classList.remove("show"), 3000);
     }
 
-    // เริ่มต้นการทำงานของแอปพลิเคชัน
     initialize();
 });
