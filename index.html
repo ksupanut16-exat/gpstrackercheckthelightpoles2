@@ -203,7 +203,22 @@
    /* ===== NAME FALLBACKS (กรณีคอลัมน์ Name ว่าง) ===== */
    const NAME_FALLBACK_SET = new Set(["SP01","SO02","SP03","HM01","HM02","HM03"]);
    const toId = (x) => (x ?? "").toString().trim().toUpperCase(); // แปลงเป็นตัวพิมพ์ใหญ่ ตัดช่องว่าง
-    
+    // === Helpers สำหรับดึงรหัสเสาจากสตริง (เช่น SP5, SP-05, SP 005, HM12, SO2) ===
+function extractCode(str) {
+  const s = (str ?? "").toString().trim();
+  if (!s) return null;
+  // จับ SP/HM/SO ตามด้วยตัวเลข 1–4 หลัก (รองรับมีเว้นวรรค/ขีด/ศูนย์นำหน้า)
+  const m = s.toUpperCase().match(/\b(SP|HM|SO)\s*[- ]?\s*0*(\d{1,4})\b/);
+  return m ? `${m[1]}${m[2]}` : null; // ไม่เติมศูนย์นำหน้าเพิ่ม เพื่อคงรูปแบบเรียบง่าย (SP5 ก็ SP5)
+}
+
+function deriveName(nameRaw, statusRaw) {
+  const nameTxt = (nameRaw ?? "").toString().trim();
+  if (nameTxt) return nameTxt;            // ถ้า name มีค่าอยู่แล้ว ใช้เลย
+  const codeFromStatus = extractCode(statusRaw);
+  return codeFromStatus || "";            // ถ้า name ว่าง → ลองดึงจาก status
+}
+/* ===== ===== */
     window.onload = () => {
       const map = L.map('map').setView([13.736717, 100.523186], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
@@ -342,35 +357,34 @@
 
           rows.forEach((r, i) => {
   // อ่านค่าพร้อมสำรองจาก .f (formatted) เผื่อ .v ว่าง
-  let name   = toText(r.c[0]?.v) || toText(r.c[0]?.f);  // Name
-  const latNum = toNumber(r.c[1]?.v) || toNumber(r.c[1]?.f);
-  const lngNum = toNumber(r.c[2]?.v) || toNumber(r.c[2]?.f);
-  const status = toText(r.c[8]?.v) || toText(r.c[8]?.f); // Status
+  const rawName   = r.c[0]?.v ?? r.c[0]?.f;   // คอลัมน์ Name
+  const rawLat    = r.c[1]?.v ?? r.c[1]?.f;   // Latitude
+  const rawLng    = r.c[2]?.v ?? r.c[2]?.f;   // Longitude
+  const rawStatus = r.c[8]?.v ?? r.c[8]?.f;   // Status (ถ้าคอลัมน์เปลี่ยน อย่าลืมปรับ index)
 
+  const latNum = toNumber(rawLat);
+  const lngNum = toNumber(rawLng);
   if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-    console.warn(`[skip row ${i}] invalid lat/lng`, { name, lat: r.c[1]?.v, lng: r.c[2]?.v });
+    console.warn(`[skip row ${i}] invalid lat/lng`, { rawName, rawLat, rawLng });
     return;
   }
 
-  // ★★ เติมชื่ออัตโนมัติถ้า name ว่าง แต่ status เป็นหนึ่งในรายการที่กำหนด ★★
-  if (!name || !name.trim()) {
-    const statusId = toId(status);            // แปลงสถานะให้เป็นรูปแบบรหัส (ตัวพิมพ์ใหญ่)
-    if (NAME_FALLBACK_SET.has(statusId)) {
-      name = statusId;                         // กรอกชื่อจากสถานะ
-    }
-  }
+  // ★ ถ้า name ว่าง ให้พยายามดึงจาก status แบบอัตโนมัติ (รองรับ SP ตามด้วยตัวเลขทุกตัว)
+  const name   = deriveName(rawName, rawStatus);
+  const status = toText(rawStatus);
 
   const color = colorFor(status, name);
   const m = L.marker([latNum, lngNum], {
     icon: circleIcon(color),
-    name,                   // ← name ที่ถูกเติมแล้ว (ถ้าจำเป็น)
-    status                  // เก็บสถานะไว้เหมือนเดิม
+    name,           // ← name หลังเติมแล้ว
+    status          // เก็บสถานะไว้เหมือนเดิม
   }).addTo(map);
 
   createPopup(m, name, status, color);
   markers.push(m);
-  markerByName.set(name, m);
+  markerByName.set(name || `row_${i}`, m); // กันกรณีชื่อยังว่างจริง ๆ (หา code ไม่เจอ)
 });
+
 
 
           if (markers.length && (!firstDataLoaded || (AUTO_FIT_ON_REFRESH_WHEN_NOT_TRACKING && !watchID))) {
